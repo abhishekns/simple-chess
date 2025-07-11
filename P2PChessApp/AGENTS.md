@@ -49,9 +49,17 @@ P2PChessApp is an Android application that allows two users to play chess direct
     *   `res/layout`: XML layouts for activities.
 9.  **Sharing/Invitation:**
     *   `MainActivity` includes a "Share Invite" button that uses an `ACTION_SEND` Intent to share a predefined text message.
-10. **Testing:**
-    *   Primarily manual testing on two physical Android devices is required due to the nature of Wi-Fi Direct.
-    *   Key areas: discovery, connection, move synchronization, game rules, disconnection, resignation, UI responsiveness.
+10. **Testing Strategy:**
+    *   **Unit Tests:** Located in `app/src/test/`. Primarily focused on `ChessModel.kt` to ensure core game logic correctness. These are run via `./gradlew testDebugUnitTest`.
+    *   **UI/Instrumentation Tests:** Located in `app/src/androidTest/`. Basic Espresso tests (`MainActivityUITest.kt`, `GameActivityUITest.kt`) verify UI element presence and basic launch. More complex P2P interactions are challenging to automate and are primarily for manual testing. These can be run via `./gradlew connectedDebugAndroidTest` (requires connected device/emulator).
+    *   **Manual Testing:** Crucial for P2P interactions, full game flow, and usability on physical devices.
+    *   **CI Pipeline:** A GitHub Actions workflow (`.github/workflows/android-ci.yml`) is set up to:
+        *   Checkout code.
+        *   Set up JDK.
+        *   Run unit tests.
+        *   Build a debug APK.
+        *   Run Android Lint.
+        *   (Instrumentation tests via emulator in CI are commented out as a future enhancement).
 
 ### Future Agent Considerations:
 *   **Refactor Communication:** Prioritize refactoring the `MainActivity` <-> `GameActivity` communication as noted in Guideline #3.

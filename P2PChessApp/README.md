@@ -62,16 +62,39 @@ Game moves and other game-related communication (like resignations) are sent as 
     *   Open Android Studio.
     *   Select "Open an existing Android Studio project".
     *   Navigate to the cloned `P2PChessApp` directory and select it.
+    *   *Note: If the project was created in a nested `P2PChessApp` directory within the repository, ensure you open this inner directory in Android Studio.*
 
 4.  **Build the Project:**
     *   Allow Android Studio to sync Gradle files and download any necessary dependencies.
+    *   The project is configured to use JDK 11. Ensure Android Studio is using a compatible JDK (usually managed by Android Studio itself).
     *   Click on `Build > Make Project` or use the shortcut (often Ctrl+F9 or Cmd+F9).
+    *   Alternatively, you can build from the command line (from the `P2PChessApp` project root where `gradlew` is located):
+        ```bash
+        ./gradlew assembleDebug
+        ```
 
 5.  **Run the App on Two Devices:**
     *   Connect two physical Android devices to your computer via USB.
     *   Ensure USB Debugging is enabled on both devices.
     *   In Android Studio, select one device from the device dropdown and click "Run 'app'".
     *   Once the app is running on the first device, select the second device from the dropdown and click "Run 'app'" again.
+    *   Alternatively, install the APK located at `app/build/outputs/apk/debug/app-debug.apk` manually onto both devices.
+
+## Automated Testing
+
+A GitHub Actions CI pipeline is configured in `.github/workflows/android-ci.yml`. This pipeline:
+*   Triggers on pushes and pull requests to main branches.
+*   Checks out the code.
+*   Sets up JDK 11.
+*   Runs unit tests (`./gradlew testDebugUnitTest` located in `app/src/test/`).
+*   Builds a debug APK.
+*   Runs Android Lint for static code analysis.
+
+Unit tests primarily cover the core chess logic in `ChessModel.kt`. Basic Espresso UI tests are included in `app/src/androidTest/` to verify activity launch and UI element presence.
+
+To run tests locally:
+*   **Unit Tests:** `./gradlew testDebugUnitTest` (from the `P2PChessApp` project root)
+*   **Instrumentation Tests:** `./gradlew connectedDebugAndroidTest` (requires a connected device or emulator)
 
 ## How to Play
 
