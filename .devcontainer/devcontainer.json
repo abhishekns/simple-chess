@@ -1,0 +1,57 @@
+{
+    "name": "Android Dev Container for P2PChessApp",
+    // Using a Dockerfile to set up the Android SDK and other dependencies.
+    "build": {
+        "dockerfile": "Dockerfile",
+        // Add build arguments if needed in Dockerfile
+        "args": {
+            // Example: "ANDROID_BUILD_TOOLS_VERSION": "33.0.2"
+        }
+    },
+
+    // Set *default* container specific settings.json values on container create.
+    "settings": {
+        "java.home": "/usr/lib/jvm/java-11-openjdk-amd64", // Adjust if JDK version/path differs in Dockerfile
+        "java.jdt.ls.java.home": "/usr/lib/jvm/java-11-openjdk-amd64", // For Java Language Server
+        "terminal.integrated.defaultProfile.linux": "bash", // Or zsh if installed
+        "files.eol": "\n" // Ensure consistent line endings
+    },
+
+    // Add the IDs of extensions you want installed when the container is created.
+    "extensions": [
+        "vscjava.vscode-java-pack",      // Popular Java extension pack
+        "redhat.java",                   // Language Support for Java by Red Hat
+        "bbenoist.gradle",               // Gradle Language Support
+        "ms-vscode.gradle",              // Gradle Tasks (might be useful)
+        "mtxr.sqltools"                  // SQLTools, if any database interaction were planned (placeholder)
+        // Android specific extensions like "adelphes.android-dev-ext" or official Google ones
+        // often work best when the full Android Studio environment or a very comprehensive SDK setup
+        // is present. For a dev container focused on CLI builds and unit tests, these might be optional
+        // or require more configuration for full functionality.
+    ],
+
+    // Use 'forwardPorts' to make a list of ports inside the container available locally.
+    // "forwardPorts": [5037], // For ADB, though connecting to host's ADB is often preferred
+
+    // Use 'postCreateCommand' to run commands after the container is created.
+    // SDK installation is handled in Dockerfile for better caching and structure.
+    // "postCreateCommand": "echo 'Container created. Android SDK should be ready.'",
+
+    // Comment out connectAsRoot=true if you don't need access to privileged ports.
+    "remoteUser": "vscode", // Or whatever non-root user is created in your Dockerfile
+
+    // Mount the project directory into the container.
+    // This is usually handled by VS Code automatically, but can be specified.
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+
+
+    // Optional: Add run arguments for the Docker container if needed.
+    // For example, to enable KVM for running an emulator inside the container (Linux hosts):
+    // "runArgs": ["--device=/dev/kvm"],
+    // To connect to an ADB server running on the host (macOS/Windows or Linux if not using --network=host):
+    // Often requires more specific ADB setup or using tools like 'socat' to bridge.
+    // For simplicity, this setup primarily targets CLI builds and unit tests.
+    // Running emulators for instrumentation tests is an advanced topic for dev containers.
+    "shutdownAction": "stopContainer"
+}
