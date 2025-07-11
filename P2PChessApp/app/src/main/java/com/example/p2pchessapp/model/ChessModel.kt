@@ -430,8 +430,10 @@ class ChessBoard {
     private fun getKnightMoves(square: Square, piece: ChessPiece): List<ChessMove> {
         val moves = mutableListOf<ChessMove>()
         val knightMoves = listOf(
-            -2 to -1, -2 to 1, -1 to -2, -1 to 2,
-            1 to -2, 1 to 2, 2 to -1, 2 to 2
+            -2 to -1, -2 to 1, // Up L
+            -1 to -2, -1 to 2, // Left L
+            1 to -2, 1 to 2,   // Right L
+            2 to -1, 2 to 1    // Down L
         )
         for ((dr, dc) in knightMoves) {
             val nextRow = square.row + dr

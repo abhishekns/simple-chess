@@ -47,9 +47,16 @@ class GameActivity : AppCompatActivity() {
         const val EXTRA_IS_HOST = "is_host"
         const val EXTRA_OPPONENT_NAME = "opponent_name"
         // Static WeakReference to MainActivity for sending/receiving messages.
-        // This is a simplification. A better approach would be a bound service or event bus.
-        // Using a WeakReference helps prevent memory leaks if GameActivity outlives MainActivity,
-        // though the overall communication pattern could be improved.
+        // WARNING: This direct static (Weak)Reference for inter-activity communication is a
+        // simplification for this project's scope. It can be fragile and prone to issues
+        // in more complex applications or with different activity lifecycles.
+        // PREFERRED ALTERNATIVES for robust communication:
+        // 1. Bound Service: Manage network connection and data exchange in a Service.
+        //    Activities bind to the service.
+        // 2. LocalBroadcastManager or Event Bus (e.g., GreenRobot EventBus):
+        //    Decouple components by sending/receiving events.
+        // Using a WeakReference here helps mitigate direct memory leaks if GameActivity
+        // outlives MainActivity, but the pattern itself is not ideal.
         var mainActivityInstance: java.lang.ref.WeakReference<MainActivity>? = null
     }
 
@@ -73,8 +80,8 @@ class GameActivity : AppCompatActivity() {
         }
 
         // Setup P2P Listener (simplified)
-        // This listener relies on MainActivity to be available via mainActivityInstance.
-        // For more robust communication, consider using LocalBroadcastManager, an Event Bus, or a Bound Service.
+        // This listener relies on MainActivity being available via mainActivityInstance.
+        // As noted above, this inter-activity communication method is a simplification.
         mainActivityInstance?.get()?.let { main ->
              this.p2pListener = object : P2PCommunicationListener {
                 override fun sendMove(moveNotation: String) {
@@ -354,12 +361,8 @@ class ChessApplication : android.app.Application() {
     var activeGameActivity: GameActivity? = null // Kept for simplicity for now, MainActivity accesses it.
 }
 
-// Make mainActivityInstance a WeakReference in GameActivity to reduce leak potential
-// This change should be in the GameActivity class members declaration area:
-// var mainActivityInstance: WeakReference<MainActivity>? = null
-// And when setting it in MainActivity:
-// GameActivity.mainActivityInstance = WeakReference(this)
-// And when using it in GameActivity:
-// mainActivityInstance?.get()?.sendMessage(...)
-// For this iteration, will stick to the direct static reference for simplicity as per current code,
-// but acknowledge this is an area for improvement. The comments have been added.
+// The companion object holds a WeakReference to MainActivity.
+// The ChessApplication class holds a direct reference to the active GameActivity.
+// Both are part of a simplified communication pattern.
+// See comments in MainActivity's onCreate and GameActivity's companion object
+// for warnings and preferred alternatives (Bound Service, Event Bus).

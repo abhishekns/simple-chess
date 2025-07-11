@@ -14,7 +14,9 @@ import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.provider.Settings
 import android.util.Log
 import android.view.View
@@ -66,6 +68,9 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
     private var outputStream: OutputStream? = null
     private val port = 8888
 
+    private lateinit var messageHandlerThread: HandlerThread // For processing received messages
+    private lateinit var messageHandler: Handler // Handler for the message processing thread
+
 
     companion object {
         private const val TAG = "MainActivityP2P"
@@ -79,15 +84,54 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
         setContentView(binding.root)
 
         // Set the WeakReference to this MainActivity instance for GameActivity to use.
-        // This is part of a simplified communication pattern. For more robust solutions,
-        // consider Bound Services, LocalBroadcastManager, or Event Bus libraries.
+        // This is part of a simplified communication pattern used for this project's scope.
+        // WARNING: For production applications or more complex scenarios, this direct static
+        // (Weak)Reference pattern between Activities is discouraged due to potential lifecycle
+        // complexities and tight coupling.
+        // PREFERRED ALTERNATIVES:
+        // 1. Bound Service: Manage network connection and data exchange in a Service.
+        //    Activities bind to the service to communicate.
+        // 2. LocalBroadcastManager or Event Bus (e.g., GreenRobot EventBus):
+        //    Decouple components by sending and receiving events/messages.
+        // This project uses WeakReference + Application class reference for simplicity here.
         GameActivity.mainActivityInstance = java.lang.ref.WeakReference(this)
 
+        setupMessageHandler()
         setupPermissions()
         initializeWifiDirect()
         setupUI()
         registerWifiDirectReceiver()
     }
+
+    private fun setupMessageHandler() {
+        // Using a Handler on the main looper to process messages from the network thread.
+        // This keeps the network listening thread free from complex processing and ensures
+        // UI updates (like calling GameActivity methods) happen on the main thread.
+        messageHandler = object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                val receivedMessage = msg.obj as String
+                Log.d(TAG, "MessageHandler received: $receivedMessage")
+
+                val gameActivity = (application as? ChessApplication)?.activeGameActivity
+                if (gameActivity != null && !gameActivity.isFinishing) {
+                    if (receivedMessage.startsWith("MOVE:")) {
+                        gameActivity.handleOpponentMove(receivedMessage.substring(5))
+                    } else if (receivedMessage == "RESIGN") {
+                        gameActivity.handleOpponentResignation()
+                    } else {
+                        Log.w(TAG, "Unknown message type received by Handler: $receivedMessage")
+                    }
+                } else {
+                    Log.w(TAG, "GameActivity not active or finishing, message received by Handler: $receivedMessage")
+                    if (receivedMessage == "RESIGN") {
+                        Toast.makeText(this@MainActivity, "${connectedPeerName ?: "Opponent"} resigned.", Toast.LENGTH_LONG).show()
+                        handleDisconnection() // Clean up if game already ended or activity gone
+                    }
+                }
+            }
+        }
+    }
+
 
     private fun setupPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -104,18 +148,31 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // Both LOCATION_PERMISSION_REQUEST_CODE (for older Android versions)
+        // and NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE (for Android 12+)
+        // are critical for Wi-Fi Direct functionality.
+        // Currently, their denial is handled identically: log, toast, and show a dialog
+        // if "Don't ask again" was selected.
+        // If future development requires distinct handling (e.g., different rationales or fallback mechanisms),
+        // this when statement can be split into separate cases for each request code.
         when (requestCode) {
             LOCATION_PERMISSION_REQUEST_CODE, NEARBY_WIFI_DEVICES_PERMISSION_REQUEST_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Log.d(TAG, "Required permission granted.")
+                    Log.d(TAG, "Wi-Fi Direct related permission granted. Request code: $requestCode")
                 } else {
-                    Log.e(TAG, "Permission denied. Wi-Fi Direct features may not work.")
-                    Toast.makeText(this, "Permission denied. Wi-Fi Direct may not function.", Toast.LENGTH_LONG).show()
+                    Log.e(TAG, "Wi-Fi Direct related permission denied. Request code: $requestCode. Wi-Fi Direct features may not work.")
+                    Toast.makeText(this, "Permission for Wi-Fi Direct denied. Features may not function.", Toast.LENGTH_LONG).show()
                      if (!ActivityCompat.shouldShowRequestPermissionRationale(this, permissions[0])) {
+                        // User selected "Don't ask again" or policy disabled the permission.
+                        // Guide them to app settings.
                         showPermissionDeniedDialog()
                     }
                 }
             }
+            // Potentially other request codes if added in the future
+            // else -> {
+            //     Log.d(TAG, "Unhandled onRequestPermissionsResult for request code: $requestCode")
+            // }
         }
     }
 
@@ -401,31 +458,13 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
                         break
                     }
                     val receivedMessage = String(buffer, 0, bytes)
-                    Log.d(TAG, "Raw message received: $receivedMessage")
+                    Log.d(TAG, "Raw message received by listener: $receivedMessage")
 
-                    runOnUiThread {
-                        val gameActivity = (application as? ChessApplication)?.activeGameActivity
-                        if (gameActivity != null) {
-                            if (receivedMessage.startsWith("MOVE:")) {
-                                gameActivity.handleOpponentMove(receivedMessage.substring(5))
-                            } else if (receivedMessage == "RESIGN") {
-                                gameActivity.handleOpponentResignation()
-                            } else {
-                                Log.w(TAG, "Unknown message type received: $receivedMessage")
-                            }
-                        } else {
-                            // GameActivity not active, maybe log or queue if necessary
-                        Log.w(TAG, "GameActivity not active, message received: $receivedMessage")
-                        // If message is critical like RESIGN and GameActivity is gone, maybe show dialog here
-                        if (receivedMessage == "RESIGN") {
-                            Toast.makeText(this, "${connectedPeerName ?: "Opponent"} resigned.", Toast.LENGTH_LONG).show()
-                            handleDisconnection() // Clean up
-                        }
-                        // Add a general comment about inter-activity communication here
-                        // For robust inter-activity communication, consider using a Bound Service,
-                        // LocalBroadcastManager, or an event bus library (e.g., GreenRobot EventBus).
-                        // The current static reference and Application class approach is a simplification.
-                    }
+                    // Send message to the Handler on the main thread for processing
+                    val message = messageHandler.obtainMessage()
+                    message.obj = receivedMessage
+                    messageHandler.sendMessage(message)
+
                 } catch (e: IOException) {
                     Log.e(TAG, "Error reading message: ${e.message}", e)
                     handleDisconnection()
