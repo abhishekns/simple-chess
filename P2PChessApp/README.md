@@ -96,6 +96,51 @@ To run tests locally:
 *   **Unit Tests:** `./gradlew testDebugUnitTest` (from the `P2PChessApp` project root)
 *   **Instrumentation Tests:** `./gradlew connectedDebugAndroidTest` (requires a connected device or emulator)
 
+## Development with VS Code Dev Containers
+
+This project includes support for VS Code Dev Containers, providing a consistent and pre-configured development environment.
+
+### Prerequisites for Dev Containers:
+
+*   **Visual Studio Code:** Latest version installed.
+*   **Docker Desktop:** Installed and running on your system (Windows, macOS, or Linux).
+*   **VS Code Remote - Containers extension:** Install this extension from the VS Code Marketplace (`ms-vscode-remote.remote-containers`).
+
+### Opening in Dev Container:
+
+1.  **Clone the Repository:** If you haven't already:
+    ```bash
+    git clone <repository-url>
+    cd <repository-name> # Navigate to the root of the repository
+    ```
+2.  **Open in VS Code:**
+    *   Open Visual Studio Code.
+    *   Go to `File > Open Folder...` and select the cloned repository root directory (the one containing `.devcontainer` and `P2PChessApp` folders).
+3.  **Reopen in Container:**
+    *   VS Code should detect the `.devcontainer/devcontainer.json` file and show a notification at the bottom right: "Folder contains a Dev Container configuration file. Reopen in Container."
+    *   Click "**Reopen in Container**".
+    *   VS Code will build the Docker image as defined in `.devcontainer/Dockerfile` (this might take some time on the first run) and then start the Dev Container.
+    *   Your VS Code window will reload, and you'll be working inside the containerized environment. The terminal in VS Code will now be a terminal within the container.
+
+### Working in the Dev Container:
+
+*   **Project Directory:** Your project files (including the `P2PChessApp` Android project) will be available at `/workspaces/<repository-name>/P2PChessApp` inside the container.
+*   **Building the App:** Open a terminal in VS Code (Ctrl+` or Cmd+`) and navigate to the Android project directory:
+    ```bash
+    cd P2PChessApp
+    ./gradlew assembleDebug
+    ```
+*   **Running Unit Tests:**
+    ```bash
+    cd P2PChessApp
+    ./gradlew testDebugUnitTest
+    ```
+*   **Running Instrumentation Tests:**
+    *   Running instrumentation tests (`./gradlew connectedDebugAndroidTest`) typically requires an Android Emulator.
+    *   Setting up and running an emulator *inside* a Dev Container can be complex (requiring KVM access for Docker, X11 forwarding, etc.) and is not fully configured by default in this setup.
+    *   A common approach is to run the Android Emulator on your **host machine** and configure ADB within the Dev Container to connect to the host's ADB server. This often involves network configuration (e.g., using host networking for the container or specific port forwarding for ADB). This advanced setup is not covered by the default `devcontainer.json`.
+    *   For now, unit tests are the primary automated tests runnable directly and easily within this Dev Container setup.
+
 ## How to Play
 
 1.  **Enable Wi-Fi:** Ensure Wi-Fi is enabled on both devices. Wi-Fi Direct uses Wi-Fi hardware. (Location services may also need to be enabled on some Android versions for Wi-Fi scanning to work effectively).
