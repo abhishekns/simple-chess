@@ -1,0 +1,81 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main, master, develop ] # Adjust branches as needed
+  pull_request:
+    branches: [ main, master, develop ] # Adjust branches as needed
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin' # Popular OpenJDK distribution
+        java-version: '11' # Android Gradle Plugin compatibility
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x ./gradlew
+      working-directory: ./P2PChessApp # Assuming gradlew is in P2PChessApp subdirectory
+
+    - name: Run unit tests
+      run: ./gradlew testDebugUnitTest
+      working-directory: ./P2PChessApp
+
+    # Optional: Build debug APK
+    - name: Build debug APK
+      run: ./gradlew assembleDebug
+      working-directory: ./P2PChessApp
+
+    # Optional: Upload APK as artifact (uncomment to use)
+    # - name: Upload APK
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: app-debug.apk
+    #     path: P2PChessApp/app/build/outputs/apk/debug/app-debug.apk
+
+    # --- Placeholder for Instrumentation Tests ---
+    # To run instrumentation tests, you'd typically need an Android emulator.
+    # The following is a commented-out example using a popular GitHub Action for this.
+    # This requires more setup and configuration (e.g., API level for emulator).
+
+    # - name: Run Android Instrumentation Tests
+    #   uses: reactivecircus/android-emulator-runner@v2
+    #   with:
+    #     api-level: 29 # Example API level
+    #     script: ./gradlew connectedCheck # or connectedDebugAndroidTest
+    #     working-directory: ./P2PChessApp
+    # ---------------------------------------------
+
+    # Optional: Run Android Lint (Static Analysis)
+    - name: Run Android Lint
+      run: ./gradlew lintDebug
+      working-directory: ./P2PChessApp
+      continue-on-error: true # Optional: Allow workflow to continue if lint finds issues
+
+    # Optional: Upload Lint results (uncomment to use)
+    # - name: Upload Lint results
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: lint-results
+    #     path: P2PChessApp/app/build/reports/lint-results-debug.html
+    #   if: always() # Ensure it runs even if previous steps failed (e.g., lint found errors)
+
+# Note:
+# 1. The `working-directory: ./P2PChessApp` assumes your Android project root (where gradlew is)
+#    is inside a subdirectory named "P2PChessApp" in your repository.
+#    If your gradlew is at the root of the repository, remove `working-directory` lines.
+# 2. Ensure your project uses Java 11 or configure the JDK version accordingly.
+#    Newer Android Gradle Plugins might require JDK 17. Adjust as needed.
+# 3. For `reactivecircus/android-emulator-runner` to work, you might need to enable
+#    hardware acceleration (KVM) on the GitHub Actions runner if it's self-hosted,
+#    or rely on the capabilities of GitHub-hosted runners.
+# 4. API level for emulator in instrumentation tests should match something your app supports.
+# 5. If your unit tests require Android framework classes not available on a standard JVM,
+#    you might need to configure Robolectric. These tests assume standard JVM unit tests.
