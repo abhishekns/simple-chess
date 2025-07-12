@@ -47,13 +47,13 @@ RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-b
     && rm /tmp/gradle.zip
 
 # ---------- accept licences & install SDK components ----------
-RUN yes | sdkmanager --licenses > /dev/null \
- && sdkmanager --install \
+RUN yes | sdkmanager --licenses > /dev/null
+RUN sdkmanager --install \
         "platform-tools" \
-        "platforms;android-33" \
-        "build-tools;33.0.2" \
+        "platforms;android-34" \
+        "build-tools;34.0.0" \
         "emulator" \
-        "system-images;android-33;google_apis;x86_64"   # uncomment if you need an emulator image
+        "system-images;android-34;google_apis;x86_64"
 
 # ---------- create non‑root user (works even if it already exists) ----------
 RUN set -eux; \
