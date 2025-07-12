@@ -1,48 +1,59 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.android' version '1.9.22'
 }
 
 android {
-    namespace 'com.example.p2pchessapp'
-    compileSdk 33 // Target Android 13 (Tiramisu)
+    /* ---------- AGP 7.4+ requires this ----------- */
+    namespace "com.example.p2pchessapp"
+
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.example.p2pchessapp"
-        minSdk 21 // Target Android 5.0 (Lollipop) - Wi-Fi Direct was introduced in API 14
+        minSdk 24
         targetSdk 33
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables { useSupportLibrary true }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile(
+                'proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
+
     buildFeatures {
-        viewBinding true // Enable ViewBinding
+        viewBinding true
+        dataBinding true
     }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.9.0' // Updated to a more recent version
-    implementation 'androidx.appcompat:appcompat:1.6.1' // Updated to a more recent version
-    implementation 'com.google.android.material:material:1.8.0' // Updated to a more recent version
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4' // Updated to a more recent version
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')
 
-    // Wi-Fi Direct dependencies are part of the Android SDK, no specific library needed here usually
+    // AndroidX + Material
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'com.google.android.material:material:1.11.0'
 
+    // Coroutines (optional)
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // Tests
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
