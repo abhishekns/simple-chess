@@ -5,6 +5,8 @@
         "dockerfile": "Dockerfile",
         // Add build arguments if needed in Dockerfile
         "args": {
+			"USER_UID": "1000",
+			"USER_GID": "1000"
             // Example: "ANDROID_BUILD_TOOLS_VERSION": "33.0.2"
         }
     },

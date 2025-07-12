@@ -1,89 +1,77 @@
-# Base image with OpenJDK 11 (as specified in build.gradle and android-ci.yml)
-FROM openjdk:11-jdk
+# syntax=docker/dockerfile:1
 
-# Set environment variables for Android SDK
-ENV ANDROID_SDK_ROOT /opt/android-sdk
-ENV PATH $PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+###############################
+# Android SDK dev‑container   #
+###############################
+# ‑ Base image with JDK 17 (works for cmdline‑tools ≥ 9)
+FROM eclipse-temurin:17-jammy AS base
 
-# Install necessary packages for Android SDK, including tools for downloading
-# and managing SDK components, and for running Gradle.
-# libncurses5 is sometimes needed for older sdkmanager/avdmanager UI tools if ever invoked directly.
-# Use apt-get for Debian/Ubuntu based openjdk images.
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    unzip \
-    git \
-    libncurses5 \
-    # Add any other system dependencies your project might need (e.g., for NDK)
-    && rm -rf /var/lib/apt/lists/*
-
-# Create a non-root user 'vscode' for security and VS Code compatibility
+# ---------- build‑time arguments (override from devcontainer.json) ----------
+ARG CMDLINE_TOOLS_VERSION=10406996    # July‑2025 release – bump when you need newer
 ARG USERNAME=vscode
 ARG USER_UID=1000
-ARG USER_GID=$USER_UID
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    # Give vscode user sudo privileges if needed for some operations (use with caution)
-    # && apt-get update && apt-get install -y sudo \
-    # && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    # && chmod 0440 /etc/sudoers.d/$USERNAME \
-    && mkdir -p /opt/android-sdk \
-    && chown -R $USERNAME:$USERNAME /opt/android-sdk
+ARG USER_GID=${USER_UID}
 
-# Switch to the non-root user
-USER $USERNAME
+# ---------- proxy / TLS inspection: add corporate root CA ----------
+COPY ./certs/ /usr/local/share/ca-certificates/
 
-# Download and install Android SDK command-line tools
-# Ensure the version of cmdline-tools is recent enough or matches your needs.
-# Check official Android Studio download page for latest versions.
-ARG CMDLINE_TOOLS_VERSION="9477386" # As of late 2023, check for newer versions
+# ---------- system packages ----------
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        wget unzip git \
+        ca-certificates ca-certificates-java \
+    && update-ca-certificates -f \
+    # import corporate CA into Temurin JDK cacerts (idempotent)                   \
+    && keytool -importcert -noprompt -trustcacerts -alias umbrella \
+      -file /usr/local/share/ca-certificates/umbrella-root.crt \
+      -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit || true \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# ---------- environment ----------
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:/opt/gradle/bin
+
+# ---------- download command‑line tools ----------
 RUN mkdir -p $ANDROID_SDK_ROOT/cmdline-tools \
-    && wget -q https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip -O /tmp/cmdline-tools.zip \
-    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_SDK_ROOT/cmdline-tools \
-    && mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest \
-    && rm /tmp/cmdline-tools.zip
+ && wget -q https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip -O /tmp/cmdline-tools.zip \
+ && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_SDK_ROOT/cmdline-tools \
+ && mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest \
+ && rm /tmp/cmdline-tools.zip
 
-# Accept SDK licenses and install required SDK packages
-# Adjust packages as per your project's build.gradle (compileSdk, buildToolsVersion)
-# The `yes |` part is to automatically accept licenses.
-RUN yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
-RUN $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" \
-    "build-tools;33.0.2" \
-    "platform-tools" \
-    # "emulator" # Uncomment if you want to install the emulator in the container
-    # "system-images;android-33;google_apis;x86_64" # Uncomment for a system image
+# ---------- install Gradle 8.7 ----------
+ARG GRADLE_VERSION=8.7
+RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -O /tmp/gradle.zip \
+    && unzip -q /tmp/gradle.zip -d /opt \
+    && ln -s /opt/gradle-${GRADLE_VERSION} /opt/gradle \
+    && rm /tmp/gradle.zip
 
-# Set up Gradle user home to be inside the workspace to persist dependencies
-# This can speed up subsequent builds after the first one.
-# However, this might not be ideal if the workspace is cleaned often.
-# Alternatively, use a Docker volume for Gradle caches.
-# ENV GRADLE_USER_HOME /workspaces/${localWorkspaceFolderBasename}/.gradle
-# RUN mkdir -p $GRADLE_USER_HOME && chown -R $USERNAME:$USERNAME $GRADLE_USER_HOME
-# For simplicity, default Gradle home (~/.gradle) will be used inside container.
+# ---------- accept licences & install SDK components ----------
+RUN yes | sdkmanager --licenses > /dev/null \
+ && sdkmanager --install \
+        "platform-tools" \
+        "platforms;android-33" \
+        "build-tools;33.0.2" \
+        "emulator" \
+        "system-images;android-33;google_apis;x86_64"   # uncomment if you need an emulator image
 
-# Verify installations (optional)
-# RUN java -version
-# RUN $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed
+# ---------- create non‑root user (works even if it already exists) ----------
+RUN set -eux; \
+    if ! getent group "$USER_GID" >/dev/null; then \
+        groupadd -g "$USER_GID" "$USERNAME"; \
+    fi; \
+    if ! id -u "$USERNAME" >/dev/null 2>&1; then \
+        useradd -u "$USER_UID" -g "$USER_GID" -m "$USERNAME"; \
+    fi; \
+    mkdir -p /workspaces /opt/android-sdk; \
+    chown -R "$USER_UID:$USER_GID" /workspaces /opt/android-sdk
 
-# Default command (optional, can be overridden by devcontainer.json or run commands)
-# CMD ["/bin/bash"]
 
-# Ensure gradlew in the workspace is executable after mounting (if needed)
-# This is often better handled by a postCreateCommand or postAttachCommand in devcontainer.json
-# if the workspace content isn't available during Docker build time for this step.
-# WORKDIR /workspaces/${localWorkspaceFolderBasename}/P2PChessApp
-# RUN chmod +x ./gradlew
-
-# Final USER directive to ensure VS Code server runs as vscode
 USER $USERNAME
 WORKDIR /workspaces
 
-# Note:
-# - KVM for emulator acceleration is not configured here as it requires host Docker daemon config.
-# - For running emulators inside the container, more setup (like X11 forwarding or VNC) might be needed.
-#   It's often simpler to run the emulator on the host and connect via ADB if needed.
-# - Ensure the CMDLINE_TOOLS_VERSION is up-to-date or suitable.
-# - The specific build-tools version (33.0.2) and platform (android-33) should match your project.
-# - This Dockerfile provides a basic CLI environment for Android builds and unit tests.
-#   Full Android Studio-like experience in a dev container is more complex.
+# ---------- create Gradle cache folder (feature scripts rely on it) ----------
+RUN mkdir -p /workspaces/.gradle
+
+# ---------- default command ----------
+CMD ["bash"]
