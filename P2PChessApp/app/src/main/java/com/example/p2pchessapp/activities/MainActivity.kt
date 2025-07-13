@@ -15,6 +15,7 @@ import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
 import android.provider.Settings
@@ -35,12 +36,12 @@ import com.example.p2pchessapp.network.WifiDirectBroadcastReceiver
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.lang.ref.WeakReference
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Executors
-
 
 class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP2pManager.ConnectionInfoListener {
 
@@ -70,7 +71,7 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
 
     private lateinit var messageHandlerThread: HandlerThread // For processing received messages
     private lateinit var messageHandler: Handler // Handler for the message processing thread
-
+    private lateinit var mainActivityInstance: MainActivity
 
     companion object {
         private const val TAG = "MainActivityP2P"
@@ -200,7 +201,7 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
         if (channel == null) {
             Toast.makeText(this, "Failed to initialize Wi-Fi P2P channel.", Toast.LENGTH_LONG).show(); finish(); return
         }
-        receiver = WifiDirectBroadcastReceiver(manager, channel, this)
+        receiver = WifiDirectBroadcastReceiver(manager as WifiP2pManager, channel as WifiP2pManager.Channel, this, this, this)
     }
 
     private fun registerWifiDirectReceiver() {
@@ -269,12 +270,12 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
         manager?.discoverPeers(channel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d(TAG, "Peer discovery initiated.")
-                Toast.makeText(MainActivity@this, "Peer discovery initiated", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Peer discovery initiated", Toast.LENGTH_SHORT).show()
                 isDiscovering = true
             }
             override fun onFailure(reasonCode: Int) {
                 Log.e(TAG, "Peer discovery failed. Reason: $reasonCode")
-                Toast.makeText(MainActivity@this, "Peer discovery failed. Code: $reasonCode", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Peer discovery failed. Code: $reasonCode", Toast.LENGTH_SHORT).show()
                 isDiscovering = false
                 updateStatus("Discovery failed: ${errorReasonToString(reasonCode)}. Try again.")
                 enableLobbyButtons()
@@ -307,12 +308,12 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
         manager?.connect(channel, config, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d(TAG, "Connection to ${device.deviceName} initiated.")
-                Toast.makeText(MainActivity@this, "Connecting to ${device.deviceName}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Connecting to ${device.deviceName}", Toast.LENGTH_SHORT).show()
                 updateStatus("Connecting to ${device.deviceName}...")
             }
             override fun onFailure(reasonCode: Int) {
                 Log.e(TAG, "Connection to ${device.deviceName} failed. Reason: $reasonCode")
-                Toast.makeText(MainActivity@this, "Connection failed. Code: $reasonCode", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Connection failed. Code: $reasonCode", Toast.LENGTH_SHORT).show()
                 updateStatus("Connection failed: ${errorReasonToString(reasonCode)}. Try again.")
                 enableLobbyButtons()
                 connectedPeerName = null
@@ -600,7 +601,7 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
     override fun onResume() {
         super.onResume()
         if (receiver == null) {
-            receiver = WifiDirectBroadcastReceiver(manager, channel, this)
+            receiver = WifiDirectBroadcastReceiver(manager!!, channel!!, this, this, this)
         }
         registerReceiver(receiver, intentFilter)
         // If returning from GameActivity or if sockets are null, ensure lobby is usable
@@ -608,7 +609,7 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
             updateStatus("Welcome! Host or Join a game.")
             enableLobbyButtons()
         }
-        GameActivity.mainActivityInstance = this // Re-assign in case it was cleared
+        GameActivity.mainActivityInstance = WeakReference(this) // Re-assign in case it was cleared
     }
 
     override fun onPause() {
@@ -623,7 +624,7 @@ class MainActivity : AppCompatActivity(), WifiP2pManager.PeerListListener, WifiP
         unregisterReceiverSafe()
         disconnectAndCleanup() // More thorough cleanup
         executorService.shutdownNow()
-        if (GameActivity.mainActivityInstance == this) {
+        if (GameActivity.mainActivityInstance?.get() == this) {
              GameActivity.mainActivityInstance = null
         }
     }

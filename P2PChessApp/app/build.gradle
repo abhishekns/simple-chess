@@ -7,6 +7,10 @@ android {
     namespace 'com.example.p2pchessapp'
     compileSdk 34
 
+    buildFeatures {
+        viewBinding true
+    }
+
     defaultConfig {
         applicationId "com.example.p2pchessapp"
         minSdk 24

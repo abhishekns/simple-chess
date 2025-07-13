@@ -15,9 +15,11 @@ import androidx.core.app.ActivityCompat
 import com.example.p2pchessapp.activities.MainActivity
 
 class WifiDirectBroadcastReceiver(
-    private val manager: WifiP2pManager?,
-    private val channel: WifiP2pManager.Channel?,
-    private val activity: MainActivity // Consider using an interface for looser coupling
+    private val manager: WifiP2pManager,
+    private val channel: WifiP2pManager.Channel,
+    private val peerListListener: WifiP2pManager.PeerListListener,
+    private val connectionInfoListener: WifiP2pManager.ConnectionInfoListener,
+    private val activity: MainActivity // Add activity reference
 ) : BroadcastReceiver() {
 
     companion object {
@@ -62,8 +64,7 @@ class WifiDirectBroadcastReceiver(
                     return
                 }
 
-
-                manager?.requestPeers(channel, activity.peerListListener)
+                manager?.requestPeers(channel, peerListListener)
             }
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                 // Respond to new connection or disconnections
@@ -79,7 +80,7 @@ class WifiDirectBroadcastReceiver(
 
                 if (networkInfo?.isConnected == true) {
                     Log.d(TAG, "Connected to a peer.")
-                    manager?.requestConnectionInfo(channel, activity.connectionInfoListener)
+                    manager?.requestConnectionInfo(channel, connectionInfoListener)
                     if (wifiP2pGroup != null) {
                         Log.d(TAG, "Group formed. Group Owner: ${wifiP2pGroup.isGroupOwner}")
                         // You can also get group owner address from wifiP2pGroup.owner.deviceAddress

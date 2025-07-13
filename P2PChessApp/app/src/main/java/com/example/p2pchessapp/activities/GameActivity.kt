@@ -18,6 +18,7 @@ import com.example.p2pchessapp.R
 import com.example.p2pchessapp.databinding.ActivityGameBinding
 import com.example.p2pchessapp.model.*
 
+
 class GameActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityGameBinding
@@ -342,8 +343,8 @@ class GameActivity : AppCompatActivity() {
         if (app?.activeGameActivity == this) {
             app?.activeGameActivity = null
         }
-        if (GameActivity.mainActivityInstance?.get() == this.mainActivityInstance?.get()) { // Check if it's the same main activity
-             GameActivity.mainActivityInstance?.clear() // Clear weak reference
+        if (GameActivity.mainActivityInstance?.get() == GameActivity.mainActivityInstance?.get()) { // Check if it's the same main activity
+            GameActivity.mainActivityInstance?.clear() // Clear weak reference
         }
         p2pListener = null // Clear listener
     }
