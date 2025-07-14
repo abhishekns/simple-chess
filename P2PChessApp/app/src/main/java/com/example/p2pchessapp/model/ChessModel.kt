@@ -96,7 +96,7 @@ enum class GameState {
 }
 
 
-class ChessBoard {
+public class ChessBoard {
     // Board: 8x8 grid, null if square is empty, ChessPiece if occupied
     val squares: Array<Array<ChessPiece?>> = Array(8) { Array(8) { null } }
     var currentPlayer: PieceColor = PieceColor.WHITE
@@ -287,7 +287,7 @@ class ChessBoard {
     }
 
 
-    private fun getPossibleMovesForPiece(square: Square, isPseudoLegal: Boolean = false): List<ChessMove> {
+    public fun getPossibleMovesForPiece(square: Square, isPseudoLegal: Boolean = false): List<ChessMove> {
         val piece = getPieceAt(square) ?: return emptyList()
         val moves = mutableListOf<ChessMove>()
 
@@ -523,7 +523,7 @@ class ChessBoard {
         return false
     }
 
-    private fun updateGameState() {
+    public fun updateGameState() {
         val kingInCheck = isKingInCheck(currentPlayer)
         val hasLegalMoves = getAllLegalMovesForPlayer(currentPlayer).isNotEmpty()
 
