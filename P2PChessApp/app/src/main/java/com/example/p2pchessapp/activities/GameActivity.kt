@@ -341,7 +341,7 @@ class GameActivity : AppCompatActivity() {
         // instead of static references or Application class coupling.
         val app = applicationContext as? ChessApplication
         if (app?.activeGameActivity == this) {
-            app?.activeGameActivity = null
+            app.activeGameActivity = null
         }
         if (GameActivity.mainActivityInstance?.get() == GameActivity.mainActivityInstance?.get()) { // Check if it's the same main activity
             GameActivity.mainActivityInstance?.clear() // Clear weak reference

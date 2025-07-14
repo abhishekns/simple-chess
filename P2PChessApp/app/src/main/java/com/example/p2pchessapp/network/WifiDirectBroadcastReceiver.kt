@@ -64,7 +64,7 @@ class WifiDirectBroadcastReceiver(
                     return
                 }
 
-                manager?.requestPeers(channel, peerListListener)
+                manager.requestPeers(channel, peerListListener)
             }
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                 // Respond to new connection or disconnections
@@ -80,7 +80,7 @@ class WifiDirectBroadcastReceiver(
 
                 if (networkInfo?.isConnected == true) {
                     Log.d(TAG, "Connected to a peer.")
-                    manager?.requestConnectionInfo(channel, connectionInfoListener)
+                    manager.requestConnectionInfo(channel, connectionInfoListener)
                     if (wifiP2pGroup != null) {
                         Log.d(TAG, "Group formed. Group Owner: ${wifiP2pGroup.isGroupOwner}")
                         // You can also get group owner address from wifiP2pGroup.owner.deviceAddress
