@@ -66,6 +66,7 @@ RUN set -eux; \
     mkdir -p /workspaces /opt/android-sdk; \
     chown -R "$USER_UID:$USER_GID" /workspaces /opt/android-sdk
 
+RUN apt-get update && apt-get install -y --no-install-recommends imagemagick
 
 USER $USERNAME
 WORKDIR /workspaces

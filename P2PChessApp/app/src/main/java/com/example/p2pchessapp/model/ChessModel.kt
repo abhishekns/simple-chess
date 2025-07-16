@@ -21,6 +21,17 @@ data class Square(val row: Int, val col: Int) {
     }
 }
 
+// ----------------------
+// Helper extensions / utils
+// ----------------------
+
+/** Returns a new square offset from the current one (row/col). */
+operator fun Square.plus(offset: Pair<Int, Int>): Square =
+    Square(row + offset.first, col + offset.second)
+
+/** Board‑bounds check (0‒7). */
+private fun isInBounds(row: Int, col: Int): Boolean = row in 0..7 && col in 0..7
+
 // Represents a chess move
 data class ChessMove(
     val from: Square,
@@ -287,40 +298,52 @@ public class ChessBoard {
     }
 
 
-    public fun getPossibleMovesForPiece(square: Square, isPseudoLegal: Boolean = false): List<ChessMove> {
+    public fun getPossibleMovesForPiece(square: Square, forAttackOnly: Boolean = false): List<ChessMove> {
         val piece = getPieceAt(square) ?: return emptyList()
         val moves = mutableListOf<ChessMove>()
-
         when (piece.type) {
-            PieceType.PAWN -> moves.addAll(getPawnMoves(square, piece))
+            PieceType.PAWN -> moves.addAll(getPawnMoves(square, piece, forAttackOnly))
             PieceType.ROOK -> moves.addAll(getSlidingMoves(square, piece, listOf(0 to 1, 0 to -1, 1 to 0, -1 to 0)))
             PieceType.BISHOP -> moves.addAll(getSlidingMoves(square, piece, listOf(1 to 1, 1 to -1, -1 to 1, -1 to -1)))
             PieceType.QUEEN -> moves.addAll(getSlidingMoves(square, piece, listOf(0 to 1, 0 to -1, 1 to 0, -1 to 0, 1 to 1, 1 to -1, -1 to 1, -1 to -1)))
             PieceType.KNIGHT -> moves.addAll(getKnightMoves(square, piece))
-            PieceType.KING -> moves.addAll(getKingMoves(square, piece))
+            PieceType.KING -> moves.addAll(getKingMoves(square, piece, forAttackOnly))
         }
-
-        if (isPseudoLegal) return moves // Return all moves including those that might leave king in check
-
-        // Filter out moves that would leave the king in check
-        return moves.filter { move ->
-            val tempBoard = this.copy() // Create a temporary board copy
-            tempBoard.setPieceAt(move.to, tempBoard.getPieceAt(move.from))
-            tempBoard.setPieceAt(move.from, null)
-            if (tempBoard.getPieceAt(move.to)?.type == PieceType.KING) { // Update king pos on temp board
-                 if (piece.color == PieceColor.WHITE) tempBoard.whiteKingPos = move.to
-                 else tempBoard.blackKingPos = move.to
-            }
-            !tempBoard.isKingInCheck(piece.color)
-        }
+        return moves
     }
 
-    fun getAllLegalMovesForPlayer(playerColor: PieceColor): List<ChessMove> {
+    private fun doesMoveLeaveKingSafe(move: ChessMove, piece: ChessPiece): Boolean {
+        // remember original pieces
+        val captured = getPieceAt(move.to)
+        val originalKingPos =
+            if (piece.type == PieceType.KING) move.from else
+                if (piece.color == PieceColor.WHITE) whiteKingPos else blackKingPos
+
+        // play the move in-place
+        setPieceAt(move.to, piece)
+        setPieceAt(move.from, null)
+        if (piece.type == PieceType.KING) {
+            if (piece.color == PieceColor.WHITE) whiteKingPos = move.to else blackKingPos = move.to
+        }
+
+        val stillSafe = !isKingInCheck(piece.color)
+
+        // rollback
+        setPieceAt(move.from, piece)
+        setPieceAt(move.to, captured)
+        if (piece.type == PieceType.KING) {
+            if (piece.color == PieceColor.WHITE) whiteKingPos = originalKingPos else blackKingPos = originalKingPos
+        }
+        return stillSafe
+    }
+
+
+    fun getAllLegalMovesForPlayer(pieceColor: PieceColor): List<ChessMove> {
         val allMoves = mutableListOf<ChessMove>()
         for (r in 0..7) {
             for (c in 0..7) {
                 val piece = getPieceAt(Square(r, c))
-                if (piece != null && piece.color == playerColor) {
+                if (piece != null && piece.color == pieceColor) {
                     allMoves.addAll(getPossibleMovesForPiece(Square(r, c)))
                 }
             }
@@ -329,46 +352,29 @@ public class ChessBoard {
     }
 
 
-    private fun getPawnMoves(square: Square, piece: ChessPiece): List<ChessMove> {
+    private fun getPawnMoves(square: Square, piece: ChessPiece, forAttackOnly: Boolean = false): List<ChessMove> {
         val moves = mutableListOf<ChessMove>()
-        val direction = if (piece.color == PieceColor.WHITE) -1 else 1 // White moves up (row index decreases), Black moves down
+        val direction = if (piece.color == PieceColor.WHITE) -1 else 1
+        val startRow = if (piece.color == PieceColor.WHITE) 6 else 1
 
-        // Standard one-step move
-        val oneStep = Square(square.row + direction, square.col)
-        if (isValidSquare(oneStep.row, oneStep.col) && getPieceAt(oneStep) == null) {
-            if (isPromotionSquare(oneStep, piece.color)) {
-                addPromotionMoves(moves, square, oneStep, piece)
-            } else {
-                moves.add(ChessMove(square, oneStep, piece))
-            }
-
-            // Two-step initial move
-            if (!piece.hasMoved) {
-                val twoSteps = Square(square.row + 2 * direction, square.col)
-                if (isValidSquare(twoSteps.row, twoSteps.col) && getPieceAt(twoSteps) == null) {
-                    moves.add(ChessMove(square, twoSteps, piece))
-                }
+        val front = square + Pair(direction, 0)
+        if (!forAttackOnly && isInBounds(front.row, front.col) && getPieceAt(front) == null) {
+            moves.add(ChessMove(square, front, piece))
+            val doubleFront = square + Pair(2 * direction, 0)
+            if (square.row == startRow && getPieceAt(doubleFront) == null) {
+                moves.add(ChessMove(square, doubleFront, piece))
             }
         }
 
-        // Captures
-        val captureOffsets = listOf(-1, 1)
-        for (offset in captureOffsets) {
-            val captureSquare = Square(square.row + direction, square.col + offset)
-            if (isValidSquare(captureSquare.row, captureSquare.col)) {
-                val targetPiece = getPieceAt(captureSquare)
+        val attackOffsets = listOf(Pair(direction, -1), Pair(direction, 1))
+        for (offset in attackOffsets) {
+            val target = square + offset
+            if (isInBounds(target.row, target.col)) {
+                val targetPiece = getPieceAt(target)
                 if (targetPiece != null && targetPiece.color != piece.color) {
-                     if (isPromotionSquare(captureSquare, piece.color)) {
-                        addPromotionMoves(moves, square, captureSquare, piece, capturedPiece = targetPiece)
-                    } else {
-                        moves.add(ChessMove(square, captureSquare, piece, capturedPiece = targetPiece))
-                    }
-                }
-                // En Passant
-                else if (targetPiece == null && canEnPassant(square, captureSquare)) {
-                    val capturedPawnSquare = Square(square.row, captureSquare.col)
-                    val enPassantCapturedPiece = getPieceAt(capturedPawnSquare)
-                     moves.add(ChessMove(square, captureSquare, piece, capturedPiece = enPassantCapturedPiece, isEnPassant = true))
+                    moves.add(ChessMove(square, target, piece, capturedPiece = targetPiece))
+                } else if (!forAttackOnly && canEnPassant(square, target)) {
+                    moves.add(ChessMove(square, target, piece, isEnPassant = true))
                 }
             }
         }
@@ -449,7 +455,7 @@ public class ChessBoard {
         return moves
     }
 
-    private fun getKingMoves(square: Square, piece: ChessPiece): List<ChessMove> {
+    private fun getKingMoves(square: Square, piece: ChessPiece, forAttackOnly: Boolean = false): List<ChessMove> {
         val moves = mutableListOf<ChessMove>()
         val kingOffsets = listOf(
             -1 to -1, -1 to 0, -1 to 1,
@@ -467,6 +473,10 @@ public class ChessBoard {
                     moves.add(ChessMove(square, targetSquare, piece, capturedPiece = targetPiece))
                 }
             }
+        }
+        if (forAttackOnly) {
+            // Add castling moves if applicable
+            return moves
         }
         // Castling (Kingside and Queenside)
         if (!piece.hasMoved && !isKingInCheck(piece.color)) {
@@ -499,25 +509,13 @@ public class ChessBoard {
     }
 
     // Checks if a square is attacked by the opponent
-    fun isSquareAttacked(square: Square, attackerColor: PieceColor): Boolean {
+    private fun isSquareAttacked(square: Square, byColor: PieceColor): Boolean {
         for (r in 0..7) {
             for (c in 0..7) {
-                val piece = getPieceAt(Square(r, c))
-                if (piece != null && piece.color == attackerColor) {
-                    // Get all pseudo-legal moves for this attacking piece
-                    // Pseudo-legal means it doesn't consider if its own king is left in check
-                    val pseudoMoves = when (piece.type) {
-                        PieceType.PAWN -> getPawnMoves(Square(r,c), piece).filter { it.capturedPiece != null || it.isEnPassant } // Only capture moves for pawns
-                        PieceType.ROOK -> getSlidingMoves(Square(r,c), piece, listOf(0 to 1, 0 to -1, 1 to 0, -1 to 0))
-                        PieceType.BISHOP -> getSlidingMoves(Square(r,c), piece, listOf(1 to 1, 1 to -1, -1 to 1, -1 to -1))
-                        PieceType.QUEEN -> getSlidingMoves(Square(r,c), piece, listOf(0 to 1, 0 to -1, 1 to 0, -1 to 0, 1 to 1, 1 to -1, -1 to 1, -1 to -1))
-                        PieceType.KNIGHT -> getKnightMoves(Square(r,c), piece)
-                        PieceType.KING -> getKingMoves(Square(r,c), piece) // King can attack adjacent squares
-                    }
-                    if (pseudoMoves.any { it.to == square }) {
-                        return true
-                    }
-                }
+                val attacker = getPieceAt(Square(r, c)) ?: continue
+                if (attacker.color != byColor) continue
+                val moves = getPossibleMovesForPiece(Square(r, c), forAttackOnly = true)
+                if (moves.any { it.to == square }) return true
             }
         }
         return false

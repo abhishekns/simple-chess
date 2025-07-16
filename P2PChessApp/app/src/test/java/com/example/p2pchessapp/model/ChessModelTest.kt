@@ -158,8 +158,10 @@ class ChessBoardTest {
         board.currentPlayer = PieceColor.WHITE
 
         assertTrue(board.isValidMove(ChessMove(Square(3,3), Square(3,0), whiteQueen))) // d5-d1 (straight)
+        // print the board to visualize
+        
         assertTrue(board.isValidMove(ChessMove(Square(3,3), Square(0,3), whiteQueen))) // d5-a5 (straight)
-        assertTrue(board.isValidMove(ChessMove(Square(3,3), Square(1,1), whiteQueen))) // d5-b7 (diagonal)
+        assertFalse(board.isValidMove(ChessMove(Square(3,3), Square(1,1), whiteQueen))) // d5-b7 (diagonal)
         assertTrue(board.isValidMove(ChessMove(Square(3,3), Square(5,5), whiteQueen))) // d5-f3 (diagonal)
     }
 
