@@ -20,6 +20,9 @@ jobs:
         distribution: 'temurin' # Popular OpenJDK distribution
         java-version: '11' # Android Gradle Plugin compatibility
 
+    - name: Install Android SDK
+      run: bash setup.sh
+
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
       working-directory: ./P2PChessApp # Assuming gradlew is in P2PChessApp subdirectory
