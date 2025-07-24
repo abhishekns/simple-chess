@@ -214,7 +214,7 @@ public class ChessBoard {
         if (!isValidMove(move)) return false // This will also check for self-check
 
         // Perform the move
-        val captured = getPieceAt(move.to) // Could be different from move.capturedPiece if not pre-validated
+        // Capture any existing piece at the destination square (if present)
         setPieceAt(move.to, pieceToMove)
         setPieceAt(move.from, null)
         pieceToMove.hasMoved = true

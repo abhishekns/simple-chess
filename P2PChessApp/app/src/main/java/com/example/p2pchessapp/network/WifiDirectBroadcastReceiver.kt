@@ -6,7 +6,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
@@ -69,7 +68,14 @@ class WifiDirectBroadcastReceiver(
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                 // Respond to new connection or disconnections
                 Log.d(TAG, "P2P connection changed")
-                val networkInfo: NetworkInfo? = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO)
+
+                val wifiP2pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_INFO, android.net.wifi.p2p.WifiP2pInfo::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_INFO)
+                }
+
                 val wifiP2pGroup = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_GROUP, android.net.wifi.p2p.WifiP2pGroup::class.java)
                 } else {
@@ -77,13 +83,12 @@ class WifiDirectBroadcastReceiver(
                     intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_GROUP)
                 }
 
-
-                if (networkInfo?.isConnected == true) {
+                if (wifiP2pInfo?.groupFormed == true) {
                     Log.d(TAG, "Connected to a peer.")
                     manager.requestConnectionInfo(channel, connectionInfoListener)
-                    if (wifiP2pGroup != null) {
-                        Log.d(TAG, "Group formed. Group Owner: ${wifiP2pGroup.isGroupOwner}")
-                        // You can also get group owner address from wifiP2pGroup.owner.deviceAddress
+                    wifiP2pGroup?.let {
+                        Log.d(TAG, "Group formed. Group Owner: ${it.isGroupOwner}")
+                        // You can also get group owner address from it.owner.deviceAddress
                     }
                 } else {
                     Log.d(TAG, "Disconnected from peer.")
