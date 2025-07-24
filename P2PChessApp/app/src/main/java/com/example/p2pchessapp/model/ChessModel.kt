@@ -119,9 +119,33 @@ public class ChessBoard {
     private var whiteKingPos: Square = Square(7, 4)
     private var blackKingPos: Square = Square(0, 4)
 
+    private fun findKingPosition(color: PieceColor): Square {
+        for (r in 0..7) for (c in 0..7) {
+            val p = squares[r][c]
+            if (p?.type == PieceType.KING && p.color == color) {
+                return Square(r, c)
+            }
+        }
+        return if (color == PieceColor.WHITE) whiteKingPos else blackKingPos
+    }
+
 
     init {
         resetBoard()
+    }
+
+    /**
+     * Clears the board of all pieces without placing a new starting setup.
+     * Current player, game state and history are also reset.
+     */
+    fun clearBoard() {
+        for (r in 0..7) for (c in 0..7) squares[r][c] = null
+        currentPlayer = PieceColor.WHITE
+        gameState = GameState.ONGOING
+        lastMove = null
+        moveHistory.clear()
+        whiteKingPos = Square(7, 4)
+        blackKingPos = Square(0, 4)
     }
 
     fun resetBoard() {
@@ -253,7 +277,8 @@ public class ChessBoard {
         if (targetPiece != null && targetPiece.color == piece.color) return false // Cannot capture own piece
 
         // Validate piece-specific rules
-        val validPieceMoves = getPossibleMovesForPiece(move.from, true) // Get all pseudo-legal moves
+        // Use full move generation here so normal non-capturing moves are allowed
+        val validPieceMoves = getPossibleMovesForPiece(move.from) // Get all pseudo-legal moves
         if (!validPieceMoves.any { it.from == move.from && it.to == move.to }) { // Check if the proposed move is among them
              // Special check for promotion part of the move object, as getPossibleMovesForPiece might generate multiple promotions
             if (move.promotionTo != null && piece.type == PieceType.PAWN) {
@@ -272,7 +297,7 @@ public class ChessBoard {
             // Simulate the move
             val originalPieceAtTo = getPieceAt(move.to)
             val originalPieceAtFrom = getPieceAt(move.from) // Should be 'piece'
-            val originalKingPos = if (piece.color == PieceColor.WHITE) whiteKingPos else blackKingPos
+            val originalKingPos = findKingPosition(piece.color)
 
             setPieceAt(move.to, piece)
             setPieceAt(move.from, null)
@@ -316,8 +341,7 @@ public class ChessBoard {
         // remember original pieces
         val captured = getPieceAt(move.to)
         val originalKingPos =
-            if (piece.type == PieceType.KING) move.from else
-                if (piece.color == PieceColor.WHITE) whiteKingPos else blackKingPos
+            if (piece.type == PieceType.KING) move.from else findKingPosition(piece.color)
 
         // play the move in-place
         setPieceAt(move.to, piece)
@@ -344,7 +368,12 @@ public class ChessBoard {
             for (c in 0..7) {
                 val piece = getPieceAt(Square(r, c))
                 if (piece != null && piece.color == pieceColor) {
-                    allMoves.addAll(getPossibleMovesForPiece(Square(r, c)))
+                    val pseudoMoves = getPossibleMovesForPiece(Square(r, c))
+                    for (m in pseudoMoves) {
+                        if (isValidMove(m, ignoreTurn = true)) {
+                            allMoves.add(m)
+                        }
+                    }
                 }
             }
         }
@@ -504,7 +533,7 @@ public class ChessBoard {
     }
 
     fun isKingInCheck(kingColor: PieceColor): Boolean {
-        val kingPos = if (kingColor == PieceColor.WHITE) whiteKingPos else blackKingPos
+        val kingPos = findKingPosition(kingColor)
         return isSquareAttacked(kingPos, if (kingColor == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE)
     }
 
