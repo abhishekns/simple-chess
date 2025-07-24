@@ -11,7 +11,7 @@ This document provides step-by-step instructions for deploying the Simple Chess 
    - Install with Android SDK and emulator support
 
 2. **Java Development Kit (JDK)**
-   - JDK 8 or higher required
+   - JDK 17 or higher required (for Android SDK compatibility)
    - Verify installation: `java -version`
 
 3. **Git** (for version control)
@@ -210,6 +210,23 @@ android {
 # Verify SDK path
 cat P2PChessApp/local.properties
 # Should show: sdk.dir=/path/to/android-sdk
+```
+
+#### Java Version Compatibility Error
+If you see `UnsupportedClassVersionError` with class file version 61.0:
+```bash
+# Check current Java version
+java -version
+
+# Install Java 17 (Ubuntu/Debian)
+sudo apt-get install openjdk-17-jdk
+
+# Set JAVA_HOME (add to ~/.bashrc)
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
+
+# Verify correct version
+java -version  # Should show Java 17
 ```
 
 #### Build Failures

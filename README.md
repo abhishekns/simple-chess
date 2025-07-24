@@ -11,7 +11,7 @@ This repository contains a sample Android app for playing chess over Wi-Fi Direc
 ## Quick Start
 
 ### Prerequisites
-- Java 11 or higher
+- Java 17 or higher (required for Android SDK)
 - Git
 
 ### Setup and Testing

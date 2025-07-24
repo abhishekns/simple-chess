@@ -5,9 +5,13 @@ set -e
 ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-"$HOME/android-sdk"}
 CMDLINE_VERSION=10406996
 
-# Install prerequisites
+# Install prerequisites - Updated to Java 17 for Android SDK compatibility
 sudo apt-get update
-sudo apt-get install -y wget unzip openjdk-11-jdk
+sudo apt-get install -y wget unzip openjdk-17-jdk
+
+# Set JAVA_HOME to ensure the correct Java version is used
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
 
 mkdir -p "$ANDROID_SDK_ROOT"
 cd "$ANDROID_SDK_ROOT"
@@ -33,3 +37,4 @@ if [ -d "./P2PChessApp" ]; then
 fi
 
 echo "Android SDK installed at $ANDROID_SDK_ROOT"
+echo "Using Java version: $(java -version 2>&1 | head -n 1)"
