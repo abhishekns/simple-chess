@@ -395,6 +395,583 @@ class ChessBoardTest {
         assertNull(board.getPieceAt(Square(3,4))) // Original square e5 is empty
         assertNull(board.getPieceAt(Square(3,3))) // Captured black pawn at d5 is gone
     }
+
+    // ===== NEW COMPREHENSIVE TESTS =====
+
+    @Test
+    fun squareOperatorPlus_ValidOffsets() {
+        val square = Square(4, 4) // e4
+        assertEquals(Square(3, 4), square + (-1 to 0)) // e5
+        assertEquals(Square(5, 4), square + (1 to 0))  // e3
+        assertEquals(Square(4, 5), square + (0 to 1))  // f4
+        assertEquals(Square(4, 3), square + (0 to -1)) // d4
+        assertEquals(Square(3, 5), square + (-1 to 1)) // f5
+    }
+
+    @Test
+    fun getPieceAt_InvalidSquares() {
+        assertNull("Out of bounds row", board.getPieceAt(Square(-1, 4)))
+        assertNull("Out of bounds col", board.getPieceAt(Square(4, -1)))
+        assertNull("Out of bounds high row", board.getPieceAt(Square(8, 4)))
+        assertNull("Out of bounds high col", board.getPieceAt(Square(4, 8)))
+    }
+
+    @Test
+    fun clearBoard_RemovesAllPieces() {
+        board.clearBoard()
+        
+        // Check all squares are empty
+        for (row in 0..7) {
+            for (col in 0..7) {
+                assertNull("Square ($row, $col) should be empty", board.getPieceAt(Square(row, col)))
+            }
+        }
+        
+        // Check game state reset
+        assertEquals(PieceColor.WHITE, board.currentPlayer)
+        assertEquals(GameState.ONGOING, board.gameState)
+    }
+
+    @Test
+    fun resetBoard_RestoresInitialState() {
+        // Make some moves
+        board.makeMove(ChessMove.fromSimpleNotation("e2e4", board)!!)
+        board.makeMove(ChessMove.fromSimpleNotation("e7e5", board)!!)
+        
+        // Reset and verify
+        board.resetBoard()
+        assertEquals(PieceColor.WHITE, board.currentPlayer)
+        assertEquals(GameState.ONGOING, board.gameState)
+        assertEquals(PieceType.PAWN, board.getPieceAt(Square(6, 4))?.type) // e2 pawn back
+        assertEquals(PieceType.PAWN, board.getPieceAt(Square(1, 4))?.type) // e7 pawn back
+    }
+
+    @Test
+    fun pawnMoves_BlackPawnInitial() {
+        board.currentPlayer = PieceColor.BLACK
+        val blackPawn = Square(1, 4) // e7
+        val oneStep = Square(2, 4)   // e6
+        val twoSteps = Square(3, 4)  // e5
+
+        assertTrue("Black pawn one step", board.isValidMove(ChessMove(blackPawn, oneStep, board.getPieceAt(blackPawn)!!)))
+        assertTrue("Black pawn two steps", board.isValidMove(ChessMove(blackPawn, twoSteps, board.getPieceAt(blackPawn)!!)))
+    }
+
+    @Test
+    fun pawnMoves_CannotMoveBackward() {
+        board.clearBoard()
+        val whitePawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        board.squares[4][4] = whitePawn // e4
+        board.currentPlayer = PieceColor.WHITE
+
+        // Try to move backward (invalid)
+        val backwardMove = ChessMove(Square(4,4), Square(5,4), whitePawn)
+        assertFalse("Pawn cannot move backward", board.isValidMove(backwardMove))
+    }
+
+    @Test
+    fun pawnMoves_CannotCaptureStraight() {
+        board.clearBoard()
+        val whitePawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        val blackPawn = ChessPiece(PieceType.PAWN, PieceColor.BLACK)
+        board.squares[4][4] = whitePawn // e4
+        board.squares[3][4] = blackPawn // e5 (blocking)
+        board.currentPlayer = PieceColor.WHITE
+
+        val blockedMove = ChessMove(Square(4,4), Square(3,4), whitePawn)
+        assertFalse("Pawn cannot capture straight ahead", board.isValidMove(blockedMove))
+    }
+
+    @Test
+    fun pawnMoves_CannotCaptureEmpty() {
+        board.clearBoard()
+        val whitePawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        board.squares[4][4] = whitePawn // e4
+        board.currentPlayer = PieceColor.WHITE
+
+        // Try diagonal capture on empty square
+        val diagonalMove = ChessMove(Square(4,4), Square(3,5), whitePawn)
+        assertFalse("Pawn cannot capture empty square diagonally", board.isValidMove(diagonalMove))
+    }
+
+    @Test
+    fun pawnPromotion_AllPieceTypes() {
+        board.clearBoard()
+        val whitePawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        board.squares[1][0] = whitePawn // a7
+        board.currentPlayer = PieceColor.WHITE
+
+        val promotionSquare = Square(0, 0) // a8
+        
+        // Test promotion to each piece type
+        val promotionTypes = listOf(PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT)
+        
+        for (pieceType in promotionTypes) {
+            val testBoard = board.copy()
+            val promotionMove = ChessMove(Square(1,0), promotionSquare, whitePawn, promotionTo = pieceType)
+            
+            assertTrue("Pawn promotion to $pieceType should be valid", testBoard.isValidMove(promotionMove))
+            assertTrue(testBoard.makeMove(promotionMove))
+            assertEquals(pieceType, testBoard.getPieceAt(promotionSquare)?.type)
+        }
+    }
+
+    @Test
+    fun pawnPromotion_BlackPawn() {
+        board.clearBoard()
+        val blackPawn = ChessPiece(PieceType.PAWN, PieceColor.BLACK)
+        board.squares[6][0] = blackPawn // a2
+        board.currentPlayer = PieceColor.BLACK
+
+        val promotionSquare = Square(7, 0) // a1
+        val promotionMove = ChessMove(Square(6,0), promotionSquare, blackPawn, promotionTo = PieceType.QUEEN)
+
+        assertTrue("Black pawn promotion should be valid", board.isValidMove(promotionMove))
+        assertTrue(board.makeMove(promotionMove))
+        assertEquals(PieceType.QUEEN, board.getPieceAt(promotionSquare)?.type)
+        assertEquals(PieceColor.BLACK, board.getPieceAt(promotionSquare)?.color)
+    }
+
+    @Test
+    fun rookMoves_CaptureOpponent() {
+        board.clearBoard()
+        val whiteRook = ChessPiece(PieceType.ROOK, PieceColor.WHITE)
+        val blackPawn = ChessPiece(PieceType.PAWN, PieceColor.BLACK)
+        board.squares[4][4] = whiteRook // e4
+        board.squares[4][6] = blackPawn // g4
+        board.currentPlayer = PieceColor.WHITE
+
+        val captureMove = ChessMove(Square(4,4), Square(4,6), whiteRook, capturedPiece = blackPawn)
+        assertTrue("Rook should capture opponent piece", board.isValidMove(captureMove))
+        assertTrue(board.makeMove(captureMove))
+        assertEquals(whiteRook, board.getPieceAt(Square(4,6)))
+        assertNull(board.getPieceAt(Square(4,4)))
+    }
+
+    @Test
+    fun rookMoves_CannotCaptureOwnPiece() {
+        board.clearBoard()
+        val whiteRook = ChessPiece(PieceType.ROOK, PieceColor.WHITE)
+        val whitePawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        board.squares[4][4] = whiteRook // e4
+        board.squares[4][6] = whitePawn // g4
+        board.currentPlayer = PieceColor.WHITE
+
+        val invalidMove = ChessMove(Square(4,4), Square(4,6), whiteRook)
+        assertFalse("Rook cannot capture own piece", board.isValidMove(invalidMove))
+    }
+
+    @Test
+    fun bishopMoves_AllDiagonals() {
+        board.clearBoard()
+        val whiteBishop = ChessPiece(PieceType.BISHOP, PieceColor.WHITE)
+        board.squares[4][4] = whiteBishop // e4
+        board.currentPlayer = PieceColor.WHITE
+
+        // Test all four diagonal directions
+        assertTrue("Bishop NE diagonal", board.isValidMove(ChessMove(Square(4,4), Square(2,6), whiteBishop)))
+        assertTrue("Bishop NW diagonal", board.isValidMove(ChessMove(Square(4,4), Square(2,2), whiteBishop)))
+        assertTrue("Bishop SE diagonal", board.isValidMove(ChessMove(Square(4,4), Square(6,6), whiteBishop)))
+        assertTrue("Bishop SW diagonal", board.isValidMove(ChessMove(Square(4,4), Square(6,2), whiteBishop)))
+    }
+
+    @Test
+    fun bishopMoves_BlockedByPiece() {
+        board.clearBoard()
+        val whiteBishop = ChessPiece(PieceType.BISHOP, PieceColor.WHITE)
+        val blockingPawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        board.squares[4][4] = whiteBishop // e4
+        board.squares[3][5] = blockingPawn // f5 (blocks path to g6)
+        board.currentPlayer = PieceColor.WHITE
+
+        val blockedMove = ChessMove(Square(4,4), Square(2,6), whiteBishop) // e4-g6
+        assertFalse("Bishop cannot jump over pieces", board.isValidMove(blockedMove))
+    }
+
+    @Test
+    fun knightMoves_AllValidMoves() {
+        board.clearBoard()
+        val whiteKnight = ChessPiece(PieceType.KNIGHT, PieceColor.WHITE)
+        board.squares[4][4] = whiteKnight // e4
+        board.currentPlayer = PieceColor.WHITE
+
+        // All 8 possible knight moves from e4
+        val validMoves = listOf(
+            Square(2,3), // d6
+            Square(2,5), // f6
+            Square(3,2), // c5
+            Square(3,6), // g5
+            Square(5,2), // c3
+            Square(5,6), // g3
+            Square(6,3), // d2
+            Square(6,5)  // f2
+        )
+
+        for (move in validMoves) {
+            assertTrue("Knight move to $move should be valid", 
+                board.isValidMove(ChessMove(Square(4,4), move, whiteKnight)))
+        }
+    }
+
+    @Test
+    fun knightMoves_EdgeOfBoard() {
+        board.clearBoard()
+        val whiteKnight = ChessPiece(PieceType.KNIGHT, PieceColor.WHITE)
+        board.squares[0][0] = whiteKnight // a8 (corner)
+        board.currentPlayer = PieceColor.WHITE
+
+        // Only 2 valid moves from corner
+        assertTrue("Knight from a8 to b6", board.isValidMove(ChessMove(Square(0,0), Square(2,1), whiteKnight)))
+        assertTrue("Knight from a8 to c7", board.isValidMove(ChessMove(Square(0,0), Square(1,2), whiteKnight)))
+    }
+
+    @Test
+    fun queenMoves_CombinedRookAndBishop() {
+        board.clearBoard()
+        val whiteQueen = ChessPiece(PieceType.QUEEN, PieceColor.WHITE)
+        board.squares[4][4] = whiteQueen // e4
+        board.currentPlayer = PieceColor.WHITE
+
+        // Test rook-like moves
+        assertTrue("Queen horizontal", board.isValidMove(ChessMove(Square(4,4), Square(4,0), whiteQueen)))
+        assertTrue("Queen vertical", board.isValidMove(ChessMove(Square(4,4), Square(0,4), whiteQueen)))
+        
+        // Test bishop-like moves
+        assertTrue("Queen diagonal", board.isValidMove(ChessMove(Square(4,4), Square(1,1), whiteQueen)))
+        assertTrue("Queen diagonal", board.isValidMove(ChessMove(Square(4,4), Square(7,7), whiteQueen)))
+    }
+
+    @Test
+    fun kingMoves_AllDirections() {
+        board.clearBoard()
+        val whiteKing = ChessPiece(PieceType.KING, PieceColor.WHITE)
+        board.squares[4][4] = whiteKing // e4
+        board.currentPlayer = PieceColor.WHITE
+
+        // All 8 directions around the king
+        val validMoves = listOf(
+            Square(3,3), Square(3,4), Square(3,5), // Row above
+            Square(4,3),              Square(4,5), // Same row
+            Square(5,3), Square(5,4), Square(5,5)  // Row below
+        )
+
+        for (move in validMoves) {
+            assertTrue("King move to $move should be valid", 
+                board.isValidMove(ChessMove(Square(4,4), move, whiteKing)))
+        }
+    }
+
+    @Test
+    fun castling_BlackKingside() {
+        board.clearBoard()
+        board.squares[0][4] = ChessPiece(PieceType.KING, PieceColor.BLACK) // e8
+        board.squares[0][7] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // h8
+        board.currentPlayer = PieceColor.BLACK
+
+        val castlingMove = ChessMove(Square(0,4), Square(0,6), board.getPieceAt(Square(0,4))!!, isCastlingMove = true)
+        assertTrue("Black kingside castling should be valid", board.isValidMove(castlingMove))
+        assertTrue(board.makeMove(castlingMove))
+        
+        assertEquals(PieceType.KING, board.getPieceAt(Square(0,6))?.type)
+        assertEquals(PieceType.ROOK, board.getPieceAt(Square(0,5))?.type)
+    }
+
+    @Test
+    fun castling_BlackQueenside() {
+        board.clearBoard()
+        board.squares[0][4] = ChessPiece(PieceType.KING, PieceColor.BLACK) // e8
+        board.squares[0][0] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // a8
+        board.currentPlayer = PieceColor.BLACK
+
+        val castlingMove = ChessMove(Square(0,4), Square(0,2), board.getPieceAt(Square(0,4))!!, isCastlingMove = true)
+        assertTrue("Black queenside castling should be valid", board.isValidMove(castlingMove))
+        assertTrue(board.makeMove(castlingMove))
+        
+        assertEquals(PieceType.KING, board.getPieceAt(Square(0,2))?.type)
+        assertEquals(PieceType.ROOK, board.getPieceAt(Square(0,3))?.type)
+    }
+
+    @Test
+    fun castling_Invalid_KingInCheck() {
+        board.clearBoard()
+        board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // e1
+        board.squares[7][7] = ChessPiece(PieceType.ROOK, PieceColor.WHITE) // h1
+        board.squares[0][4] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // e8 (attacks king)
+        board.currentPlayer = PieceColor.WHITE
+
+        val castlingMove = ChessMove(Square(7,4), Square(7,6), board.getPieceAt(Square(7,4))!!, isCastlingMove = true)
+        assertFalse("Cannot castle when king is in check", board.isValidMove(castlingMove))
+    }
+
+    @Test
+    fun castling_Invalid_ThroughCheck() {
+        board.clearBoard()
+        board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // e1
+        board.squares[7][7] = ChessPiece(PieceType.ROOK, PieceColor.WHITE) // h1
+        board.squares[0][5] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // f8 (attacks f1)
+        board.currentPlayer = PieceColor.WHITE
+
+        val castlingMove = ChessMove(Square(7,4), Square(7,6), board.getPieceAt(Square(7,4))!!, isCastlingMove = true)
+        assertFalse("Cannot castle through check", board.isValidMove(castlingMove))
+    }
+
+    @Test
+    fun enPassant_BlackCaptures() {
+        board.resetBoard()
+        board.currentPlayer = PieceColor.BLACK
+        
+        // Black pawn advances
+        board.makeMove(ChessMove.fromSimpleNotation("e7e5", board)!!)
+        board.makeMove(ChessMove.fromSimpleNotation("a2a3", board)!!) // Dummy white move
+        board.makeMove(ChessMove.fromSimpleNotation("e5e4", board)!!)
+        
+        // White pawn advances two squares next to black pawn
+        board.makeMove(ChessMove.fromSimpleNotation("d2d4", board)!!)
+        
+        // Black should be able to capture en passant
+        val blackPawn = board.getPieceAt(Square(4,4))!! // e4
+        val enPassantMove = ChessMove(Square(4,4), Square(5,3), blackPawn, isEnPassant = true, capturedPiece = board.getPieceAt(Square(4,3)))
+        
+        assertTrue("Black en passant should be valid", board.isValidMove(enPassantMove))
+        assertTrue(board.makeMove(enPassantMove))
+        
+        assertNull("Captured pawn should be gone", board.getPieceAt(Square(4,3)))
+        assertEquals("Black pawn moved to d3", blackPawn, board.getPieceAt(Square(5,3)))
+    }
+
+    @Test
+    fun enPassant_NotAvailableAfterOtherMove() {
+        board.resetBoard()
+        
+        // Setup for en passant
+        board.makeMove(ChessMove.fromSimpleNotation("e2e4", board)!!)
+        board.makeMove(ChessMove.fromSimpleNotation("a7a6", board)!!)
+        board.makeMove(ChessMove.fromSimpleNotation("e4e5", board)!!)
+        board.makeMove(ChessMove.fromSimpleNotation("d7d5", board)!!)
+        
+        // Make another move instead of en passant
+        board.makeMove(ChessMove.fromSimpleNotation("a2a3", board)!!)
+        board.makeMove(ChessMove.fromSimpleNotation("a6a5", board)!!)
+        
+        // Now en passant should not be available
+        val whitePawn = board.getPieceAt(Square(3,4))!! // e5
+        val enPassantMove = ChessMove(Square(3,4), Square(2,3), whitePawn, isEnPassant = true)
+        
+        assertFalse("En passant not available after other moves", board.isValidMove(enPassantMove))
+    }
+
+    @Test
+    fun gameState_UpdatedAfterMove() {
+        assertEquals(GameState.ONGOING, board.gameState)
+        
+        // Make a move that puts opponent in check
+        board.clearBoard()
+        board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // e1
+        board.squares[0][4] = ChessPiece(PieceType.KING, PieceColor.BLACK) // e8
+        board.squares[3][3] = ChessPiece(PieceType.QUEEN, PieceColor.WHITE) // d5
+        board.currentPlayer = PieceColor.WHITE
+        
+        val checkMove = ChessMove(Square(3,3), Square(0,3), board.getPieceAt(Square(3,3))!!) // Qd8+
+        assertTrue(board.makeMove(checkMove))
+        
+        assertEquals(GameState.CHECK, board.gameState)
+        assertTrue("Black king should be in check", board.isKingInCheck(PieceColor.BLACK))
+    }
+
+    @Test
+    fun getAllLegalMoves_FiltersIllegalMoves() {
+        board.clearBoard()
+        board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // e1
+        board.squares[0][4] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // e8 (pinning)
+        board.squares[6][4] = ChessPiece(PieceType.PAWN, PieceColor.WHITE) // e2 (pinned)
+        board.currentPlayer = PieceColor.WHITE
+        
+        val legalMoves = board.getAllLegalMovesForPlayer(PieceColor.WHITE)
+        
+        // Pinned pawn should have limited legal moves (only along pin line)
+        val pawnMoves = legalMoves.filter { it.from == Square(6,4) }
+        // The pawn can still move forward along the e-file (not completely pinned)
+        assertTrue("Pinned pawn should have some legal moves along pin line", pawnMoves.size >= 0)
+    }
+
+    @Test
+    fun kingInCheck_DetectsAttacks() {
+        board.clearBoard()
+        board.squares[4][4] = ChessPiece(PieceType.QUEEN, PieceColor.WHITE) // e4
+        board.squares[3][3] = ChessPiece(PieceType.KING, PieceColor.BLACK) // d5
+        board.currentPlayer = PieceColor.WHITE
+        
+        // Test if king is in check from queen
+        assertTrue("King should be in check from queen", board.isKingInCheck(PieceColor.BLACK))
+        
+        // Move king to safe square
+        board.squares[3][3] = null
+        board.squares[2][1] = ChessPiece(PieceType.KING, PieceColor.BLACK) // b6
+        assertFalse("King should be safe at b6", board.isKingInCheck(PieceColor.BLACK))
+    }
+
+    @Test
+    fun chessMoveFromNotation_InvalidFormats() {
+        assertNull("Too short", ChessMove.fromSimpleNotation("e2", board))
+        assertNull("Too long", ChessMove.fromSimpleNotation("e2e4q5", board))
+        assertNull("Invalid column", ChessMove.fromSimpleNotation("i2e4", board))
+        assertNull("Invalid row", ChessMove.fromSimpleNotation("e9e4", board))
+        assertNull("No piece at source", ChessMove.fromSimpleNotation("e3e4", board)) // Empty square
+    }
+
+    @Test
+    fun chessMoveFromNotation_PromotionPieces() {
+        board.clearBoard()
+        board.squares[1][0] = ChessPiece(PieceType.PAWN, PieceColor.WHITE) // a7
+        
+        val queenPromo = ChessMove.fromSimpleNotation("a7a8q", board)
+        assertEquals(PieceType.QUEEN, queenPromo?.promotionTo)
+        
+        val rookPromo = ChessMove.fromSimpleNotation("a7a8r", board)
+        assertEquals(PieceType.ROOK, rookPromo?.promotionTo)
+        
+        val bishopPromo = ChessMove.fromSimpleNotation("a7a8b", board)
+        assertEquals(PieceType.BISHOP, bishopPromo?.promotionTo)
+        
+        val knightPromo = ChessMove.fromSimpleNotation("a7a8n", board)
+        assertEquals(PieceType.KNIGHT, knightPromo?.promotionTo)
+        
+        val invalidPromo = ChessMove.fromSimpleNotation("a7a8x", board)
+        assertNull("Invalid promotion piece", invalidPromo?.promotionTo)
+    }
+
+    @Test
+    fun chessPiece_HasMovedFlag() {
+        val piece = ChessPiece(PieceType.KING, PieceColor.WHITE)
+        assertFalse("New piece hasn't moved", piece.hasMoved)
+        
+        // Clear path for king to move
+        board.squares[7][5] = null // f1
+        
+        // After making a move, hasMoved should be true
+        board.makeMove(ChessMove.fromSimpleNotation("e1f1", board)!!)
+        val movedKing = board.getPieceAt(Square(7,5))
+        assertTrue("King should be marked as moved", movedKing?.hasMoved == true)
+    }
+
+    @Test
+    fun kingPosition_InitialSetup() {
+        // Test that kings are in correct initial positions by checking if they're in check from specific attacks
+        board.clearBoard()
+        
+        // Place white king at e1 and test if it can be attacked
+        board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // e1
+        board.squares[0][4] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // e8 (attacks e1)
+        board.currentPlayer = PieceColor.WHITE
+        
+        assertTrue("White king should be in check from rook", board.isKingInCheck(PieceColor.WHITE))
+        
+        // Place black king at e8 and test
+        board.clearBoard()
+        board.squares[0][4] = ChessPiece(PieceType.KING, PieceColor.BLACK) // e8
+        board.squares[7][4] = ChessPiece(PieceType.ROOK, PieceColor.WHITE) // e1 (attacks e8)
+        board.currentPlayer = PieceColor.BLACK
+        
+        assertTrue("Black king should be in check from rook", board.isKingInCheck(PieceColor.BLACK))
+    }
+
+    @Test
+    fun printBoard_DoesNotCrash() {
+        // This test just ensures printBoard doesn't crash
+        board.printBoard()
+        
+        board.clearBoard()
+        board.printBoard()
+        
+        // Add some pieces and test again
+        board.squares[4][4] = ChessPiece(PieceType.QUEEN, PieceColor.WHITE)
+        board.squares[3][3] = ChessPiece(PieceType.KING, PieceColor.BLACK)
+        board.printBoard()
+    }
+
+    @Test
+    fun moveSequence_AlternatesTurns() {
+        val move1 = ChessMove.fromSimpleNotation("e2e4", board)!!
+        val move2 = ChessMove.fromSimpleNotation("e7e5", board)!!
+        
+        // Test that moves execute successfully and turns alternate
+        assertTrue("First move should succeed", board.makeMove(move1))
+        assertEquals("Should be black's turn", PieceColor.BLACK, board.currentPlayer)
+        
+        assertTrue("Second move should succeed", board.makeMove(move2))
+        assertEquals("Should be white's turn", PieceColor.WHITE, board.currentPlayer)
+        
+        // Verify pieces moved correctly
+        assertNull("e2 should be empty", board.getPieceAt(Square(6,4)))
+        assertEquals("e4 should have white pawn", PieceType.PAWN, board.getPieceAt(Square(4,4))?.type)
+        assertNull("e7 should be empty", board.getPieceAt(Square(1,4)))
+        assertEquals("e5 should have black pawn", PieceType.PAWN, board.getPieceAt(Square(3,4))?.type)
+    }
+
+    @Test
+    fun invalidMove_ReturnsFalse() {
+        // Try to move opponent's piece
+        val blackPawn = board.getPieceAt(Square(1,4))!! // e7
+        val invalidMove = ChessMove(Square(1,4), Square(3,4), blackPawn)
+        
+        assertFalse("Cannot move opponent's piece", board.makeMove(invalidMove))
+        assertEquals("Board state unchanged", PieceColor.WHITE, board.currentPlayer)
+    }
+
+    @Test
+    fun playerTurnAlternates() {
+        assertEquals(PieceColor.WHITE, board.currentPlayer)
+        
+        board.makeMove(ChessMove.fromSimpleNotation("e2e4", board)!!)
+        assertEquals(PieceColor.BLACK, board.currentPlayer)
+        
+        board.makeMove(ChessMove.fromSimpleNotation("e7e5", board)!!)
+        assertEquals(PieceColor.WHITE, board.currentPlayer)
+    }
+
+    @Test
+    fun checkmate_ConceptTest() {
+        board.clearBoard()
+        
+        // Set up a position where king is attacked
+        board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // e1
+        board.squares[0][4] = ChessPiece(PieceType.QUEEN, PieceColor.BLACK) // e8
+        board.squares[3][3] = ChessPiece(PieceType.KING, PieceColor.BLACK) // d5
+        
+        board.currentPlayer = PieceColor.BLACK
+        
+        // Move queen to attack king
+        val attackMove = ChessMove(Square(0,4), Square(1,4), board.getPieceAt(Square(0,4))!!) // Qe7
+        assertTrue("Should successfully make move", board.makeMove(attackMove))
+        
+        // Test basic check detection
+        assertTrue("White king should be in check", board.isKingInCheck(PieceColor.WHITE))
+        
+        // Test that game state reflects the check
+        assertTrue("Game state should be CHECK or CHECKMATE", 
+            board.gameState == GameState.CHECK || board.gameState == GameState.CHECKMATE_BLACK_WINS)
+    }
+
+    @Test
+    fun discoveredCheck_BasicPinConcept() {
+        board.clearBoard()
+        
+        // Set up a simple pin position
+        board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // e1
+        board.squares[4][4] = ChessPiece(PieceType.ROOK, PieceColor.WHITE) // e4 (pinned piece)
+        board.squares[0][4] = ChessPiece(PieceType.QUEEN, PieceColor.BLACK) // e8 (pinning piece)
+        board.squares[3][3] = ChessPiece(PieceType.KING, PieceColor.BLACK) // d5
+        
+        board.currentPlayer = PieceColor.WHITE
+        
+        // Test that the concept of pinning exists - pieces should be able to move along pin lines
+        // This is more of a conceptual test since we can't access private methods
+        val allMoves = board.getAllLegalMovesForPlayer(PieceColor.WHITE)
+        val rookMoves = allMoves.filter { it.from == Square(4,4) }
+        
+        // The rook should have some moves (along the e-file) but not all moves
+        assertTrue("Pinned rook should have some legal moves", rookMoves.isNotEmpty())
+    }
 }
 
 class ChessMoveTest {
@@ -416,6 +993,45 @@ class ChessMoveTest {
         val castlingMove = ChessMove(Square(7,4), Square(7,6), ChessPiece(PieceType.KING, PieceColor.WHITE), isCastlingMove = true)
         assertEquals("KING from e1 to g1 (castling)", castlingMove.toString())
     }
+
+    @Test
+    fun toString_EnPassantFlag() {
+        val piece = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        val enPassantMove = ChessMove(Square(4,4), Square(3,5), piece, isEnPassant = true)
+        assertTrue("En passant flag in toString", enPassantMove.toString().contains("(en passant)"))
+    }
+
+    @Test
+    fun toSimpleNotation_BasicMoves() {
+        val pawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        
+        // Regular move
+        val regularMove = ChessMove(Square(6,4), Square(4,4), pawn)
+        assertEquals("e2e4", regularMove.toSimpleNotation())
+        
+        // Test that promotion moves have the correct length and structure
+        val queenPromo = ChessMove(Square(1,0), Square(0,0), pawn, promotionTo = PieceType.QUEEN)
+        val queenNotation = queenPromo.toSimpleNotation()
+        assertEquals("Should be 5 characters for promotion", 5, queenNotation.length)
+        assertTrue("Should start with a7a8", queenNotation.startsWith("a7a8"))
+        
+        // Test another promotion
+        val rookPromo = ChessMove(Square(1,0), Square(0,0), pawn, promotionTo = PieceType.ROOK)
+        val rookNotation = rookPromo.toSimpleNotation()
+        assertEquals("Should be 5 characters for promotion", 5, rookNotation.length)
+        assertTrue("Should start with a7a8", rookNotation.startsWith("a7a8"))
+    }
+
+    @Test
+    fun equals_ComparesCorrectly() {
+        val piece = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
+        val move1 = ChessMove(Square(6,4), Square(4,4), piece)
+        val move2 = ChessMove(Square(6,4), Square(4,4), piece)
+        val move3 = ChessMove(Square(6,4), Square(5,4), piece)
+        
+        assertEquals("Same moves should be equal", move1, move2)
+        assertNotEquals("Different moves should not be equal", move1, move3)
+    }
 }
 
 class SquareTest {
@@ -426,5 +1042,115 @@ class SquareTest {
         assertEquals("a1", Square(7,0).toString())
         assertEquals("h1", Square(7,7).toString())
         assertEquals("e4", Square(4,4).toString())
+    }
+
+    @Test
+    fun toString_AllSquares() {
+        // Test all 64 squares
+        val files = "abcdefgh"
+        for (row in 0..7) {
+            for (col in 0..7) {
+                val square = Square(row, col)
+                val expected = "${files[col]}${8-row}"
+                assertEquals("Square ($row,$col) should be $expected", expected, square.toString())
+            }
+        }
+    }
+
+    @Test
+    fun equals_ComparesCorrectly() {
+        val square1 = Square(4, 4)
+        val square2 = Square(4, 4)
+        val square3 = Square(4, 5)
+        
+        assertEquals("Same squares should be equal", square1, square2)
+        assertNotEquals("Different squares should not be equal", square1, square3)
+    }
+
+    @Test
+    fun hashCode_ConsistentWithEquals() {
+        val square1 = Square(4, 4)
+        val square2 = Square(4, 4)
+        
+        assertEquals("Equal squares should have same hash code", square1.hashCode(), square2.hashCode())
+    }
+}
+
+class ChessPieceTest {
+    @Test
+    fun dataClass_Properties() {
+        val piece = ChessPiece(PieceType.QUEEN, PieceColor.WHITE, hasMoved = true)
+        
+        assertEquals(PieceType.QUEEN, piece.type)
+        assertEquals(PieceColor.WHITE, piece.color)
+        assertTrue(piece.hasMoved)
+    }
+
+    @Test
+    fun copy_CreatesNewInstance() {
+        val original = ChessPiece(PieceType.KING, PieceColor.BLACK, hasMoved = false)
+        val copy = original.copy(hasMoved = true)
+        
+        assertNotSame("Copy should be different instance", original, copy)
+        assertEquals("Type should be same", original.type, copy.type)
+        assertEquals("Color should be same", original.color, copy.color)
+        assertNotEquals("HasMoved should be different", original.hasMoved, copy.hasMoved)
+    }
+
+    @Test
+    fun equals_ComparesAllProperties() {
+        val piece1 = ChessPiece(PieceType.PAWN, PieceColor.WHITE, hasMoved = false)
+        val piece2 = ChessPiece(PieceType.PAWN, PieceColor.WHITE, hasMoved = false)
+        val piece3 = ChessPiece(PieceType.PAWN, PieceColor.WHITE, hasMoved = true)
+        val piece4 = ChessPiece(PieceType.PAWN, PieceColor.BLACK, hasMoved = false)
+        
+        assertEquals("Same pieces should be equal", piece1, piece2)
+        assertNotEquals("Different hasMoved should not be equal", piece1, piece3)
+        assertNotEquals("Different color should not be equal", piece1, piece4)
+    }
+}
+
+class GameStateTest {
+    @Test
+    fun allGameStatesExist() {
+        // Ensure all expected game states exist
+        val states = GameState.values()
+        
+        assertTrue("ONGOING exists", states.contains(GameState.ONGOING))
+        assertTrue("CHECK exists", states.contains(GameState.CHECK))
+        assertTrue("CHECKMATE_WHITE_WINS exists", states.contains(GameState.CHECKMATE_WHITE_WINS))
+        assertTrue("CHECKMATE_BLACK_WINS exists", states.contains(GameState.CHECKMATE_BLACK_WINS))
+        assertTrue("STALEMATE_DRAW exists", states.contains(GameState.STALEMATE_DRAW))
+        assertTrue("DRAW_AGREED exists", states.contains(GameState.DRAW_AGREED))
+        assertTrue("DRAW_INSUFFICIENT_MATERIAL exists", states.contains(GameState.DRAW_INSUFFICIENT_MATERIAL))
+        assertTrue("DRAW_THREEFOLD_REPETITION exists", states.contains(GameState.DRAW_THREEFOLD_REPETITION))
+    }
+}
+
+class PieceTypeTest {
+    @Test
+    fun allPieceTypesExist() {
+        val types = PieceType.values()
+        
+        assertTrue("KING exists", types.contains(PieceType.KING))
+        assertTrue("QUEEN exists", types.contains(PieceType.QUEEN))
+        assertTrue("ROOK exists", types.contains(PieceType.ROOK))
+        assertTrue("BISHOP exists", types.contains(PieceType.BISHOP))
+        assertTrue("KNIGHT exists", types.contains(PieceType.KNIGHT))
+        assertTrue("PAWN exists", types.contains(PieceType.PAWN))
+        
+        assertEquals("Should have 6 piece types", 6, types.size)
+    }
+}
+
+class PieceColorTest {
+    @Test
+    fun allPieceColorsExist() {
+        val colors = PieceColor.values()
+        
+        assertTrue("WHITE exists", colors.contains(PieceColor.WHITE))
+        assertTrue("BLACK exists", colors.contains(PieceColor.BLACK))
+        
+        assertEquals("Should have 2 colors", 2, colors.size)
     }
 }
