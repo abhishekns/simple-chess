@@ -74,7 +74,7 @@ class ChessBoardTest {
     @Test
     fun pawnMoves_WhitePawnCapture() {
         // Setup: White pawn at e2, Black pawn at d3
-        board.resetBoard() // Clear board
+        board.clearBoard() // Clear board
         val whitePawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
         val blackPawn = ChessPiece(PieceType.PAWN, PieceColor.BLACK)
         board.squares[6][4] = whitePawn // e2
@@ -91,7 +91,7 @@ class ChessBoardTest {
 
     @Test
     fun pawnPromotion_WhitePawnToQueen() {
-        board.resetBoard()
+        board.clearBoard()
         val whitePawn = ChessPiece(PieceType.PAWN, PieceColor.WHITE)
         board.squares[1][4] = whitePawn // White pawn at e7
         board.currentPlayer = PieceColor.WHITE
@@ -107,13 +107,16 @@ class ChessBoardTest {
 
     @Test
     fun rookMoves_ValidAndInvalid() {
+        board.clearBoard()
         val rookStart = Square(7, 0) // a1
-        assertTrue(board.isValidMove(ChessMove.fromSimpleNotation("a1a3", board)!!)) // Valid move
-        board.makeMove(ChessMove.fromSimpleNotation("a2a3", board)!!) // move pawn out of the way
-        board.currentPlayer = PieceColor.WHITE // set back to white
-        assertFalse("Rook cannot jump over piece (initial)", board.isValidMove(ChessMove.fromSimpleNotation("a1a4", board)!!))
+        val rookPiece = ChessPiece(PieceType.ROOK, PieceColor.WHITE)
+        board.squares[7][0] = rookPiece
+        board.currentPlayer = PieceColor.WHITE
+        assertTrue(board.isValidMove(ChessMove.fromSimpleNotation("a1a3", board)!!)) // Valid move with clear path
+        board.squares[6][0] = ChessPiece(PieceType.PAWN, PieceColor.WHITE) // block path
+        assertFalse("Rook cannot jump over piece", board.isValidMove(ChessMove.fromSimpleNotation("a1a4", board)!!))
 
-        board.resetBoard()
+        board.clearBoard()
         val whiteRook = ChessPiece(PieceType.ROOK, PieceColor.WHITE)
         board.squares[3][3] = whiteRook // Rook at d5
         board.currentPlayer = PieceColor.WHITE
@@ -136,7 +139,7 @@ class ChessBoardTest {
         // b1 bishop blocked by c2 pawn initially
         assertFalse(board.isValidMove(ChessMove.fromSimpleNotation("c1e3", board)!!))
 
-        board.resetBoard()
+        board.clearBoard()
         val whiteBishop = ChessPiece(PieceType.BISHOP, PieceColor.WHITE)
         board.squares[3][3] = whiteBishop // Bishop at d5
         board.currentPlayer = PieceColor.WHITE
@@ -152,7 +155,7 @@ class ChessBoardTest {
         assertFalse(board.isValidMove(ChessMove.fromSimpleNotation("d1d4", board)!!))
         assertFalse(board.isValidMove(ChessMove.fromSimpleNotation("d1h5", board)!!))
 
-        board.resetBoard()
+        board.clearBoard()
         val whiteQueen = ChessPiece(PieceType.QUEEN, PieceColor.WHITE)
         board.squares[3][3] = whiteQueen // Queen at d5
         board.currentPlayer = PieceColor.WHITE
@@ -161,7 +164,7 @@ class ChessBoardTest {
         // print the board to visualize
         
         assertTrue(board.isValidMove(ChessMove(Square(3,3), Square(0,3), whiteQueen))) // d5-a5 (straight)
-        assertFalse(board.isValidMove(ChessMove(Square(3,3), Square(1,1), whiteQueen))) // d5-b7 (diagonal)
+        assertTrue(board.isValidMove(ChessMove(Square(3,3), Square(1,1), whiteQueen))) // d5-b7 (diagonal)
         assertTrue(board.isValidMove(ChessMove(Square(3,3), Square(5,5), whiteQueen))) // d5-f3 (diagonal)
     }
 
@@ -215,9 +218,9 @@ class ChessBoardTest {
     fun castling_Invalid_KingMoved() {
         board.squares[7][5] = null; board.squares[7][6] = null // Clear path
         board.makeMove(ChessMove.fromSimpleNotation("e1f1", board)!!) // Move King
-        board.makeMove(ChessMove.fromSimpleNotation("e8f8", board)!!) // Dummy black move
+        board.makeMove(ChessMove.fromSimpleNotation("a7a6", board)!!) // Dummy black move
         board.makeMove(ChessMove.fromSimpleNotation("f1e1", board)!!) // Move King back
-        board.makeMove(ChessMove.fromSimpleNotation("f8e8", board)!!) // Dummy black move
+        board.makeMove(ChessMove.fromSimpleNotation("a6a5", board)!!) // Dummy black move
 
         val king = board.getPieceAt(Square(7,4))!!
         val castlingMove = ChessMove(Square(7,4), Square(7,6), king, isCastlingMove = true)
@@ -248,7 +251,7 @@ class ChessBoardTest {
 
     @Test
     fun checkDetection_Simple() {
-        board.resetBoard()
+        board.clearBoard()
         board.squares[3][3] = ChessPiece(PieceType.ROOK, PieceColor.WHITE) // White Rook at d5
         board.squares[3][4] = ChessPiece(PieceType.KING, PieceColor.BLACK)  // Black King at e5
         board.currentPlayer = PieceColor.WHITE // White's turn, but we check black king
@@ -258,13 +261,13 @@ class ChessBoardTest {
 
     @Test
     fun selfCheck_InvalidMove() {
-        board.resetBoard()
+        board.clearBoard()
         // K . . .
         // . . . .
         // R . . . (White Rook attacking King's escape)
         // . k . . (Black King)
         board.squares[7][4] = ChessPiece(PieceType.KING, PieceColor.WHITE) // White King e1
-        board.squares[0][0] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // Black Rook a8
+        board.squares[7][0] = ChessPiece(PieceType.ROOK, PieceColor.BLACK) // Black Rook a1
         board.squares[2][0] = ChessPiece(PieceType.ROOK, PieceColor.WHITE) // White Rook a6 (protects a1)
         board.squares[0][4] = null // remove black king for this test
         board.currentPlayer = PieceColor.WHITE
@@ -350,6 +353,7 @@ class ChessBoardTest {
         assertNotEquals(board.currentPlayer, copiedBoard.currentPlayer)
 
         // Modify copied board, original should not change
+        copiedBoard.currentPlayer = PieceColor.WHITE
         copiedBoard.makeMove(ChessMove.fromSimpleNotation("d2d4", copiedBoard)!!) // White makes another move on copy
         assertNull(board.getPieceAt(Square(4,3))) // d4 on original should still be null if not moved
         assertNotNull(copiedBoard.getPieceAt(Square(4,3))) // d4 on copy should be the pawn
