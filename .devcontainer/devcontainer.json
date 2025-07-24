@@ -55,5 +55,9 @@
     // Often requires more specific ADB setup or using tools like 'socat' to bridge.
     // For simplicity, this setup primarily targets CLI builds and unit tests.
     // Running emulators for instrumentation tests is an advanced topic for dev containers.
-    "shutdownAction": "stopContainer"
+    "shutdownAction": "stopContainer",
+    "runArgs": [
+        "--privileged",
+        "--device=/dev/bus/usb:/dev/bus/usb"
+    ]
 }
