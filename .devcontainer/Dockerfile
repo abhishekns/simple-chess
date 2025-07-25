@@ -53,7 +53,8 @@ RUN sdkmanager --install \
         "platforms;android-34" \
         "build-tools;34.0.0" \
         "emulator" \
-        "system-images;android-34;google_apis;x86_64"
+        "system-images;android-34;google_apis_playstore;arm64-v8a"
+        # "system-images;android-34;google_apis_playstore;x86_64"
 
 # ---------- create non‑root user (works even if it already exists) ----------
 RUN set -eux; \
@@ -67,6 +68,17 @@ RUN set -eux; \
     chown -R "$USER_UID:$USER_GID" /workspaces /opt/android-sdk
 
 RUN apt-get update && apt-get install -y --no-install-recommends imagemagick
+
+RUN apt-get update && apt-get install -y qemu-kvm
+RUN apt-get install -y sudo
+RUN apt-get update && apt-get install -y sudo qemu-kvm \
+ && groupadd -f kvm \
+ && usermod -aG kvm "$USERNAME" \
+ && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+ && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# /dev/kvm won't exist during build, so guard the chown
+RUN if [ -e /dev/kvm ]; then chown root:kvm /dev/kvm && chmod 660 /dev/kvm; fi
 
 USER $USERNAME
 WORKDIR /workspaces

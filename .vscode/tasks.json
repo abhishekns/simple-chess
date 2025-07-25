@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "gradle:debug-chess-test",
+      "type": "shell",
+      "command": "./gradlew :app:testDebugUnitTest --tests com.example.chess.ChessBoardTest --debug-jvm --no-daemon",
+      "problemMatcher": []
+    }
+  ]
+}
